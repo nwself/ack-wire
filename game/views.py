@@ -3,16 +3,22 @@ import logging
 
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseBadRequest
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.utils.safestring import mark_safe
+
+from .models import Game
 
 
 logger = logging.getLogger(__file__)
 
 
 def game(request, game_name):
+    game = get_object_or_404(Game, name=game_name)
+    game_state = game.gamestate_set.all().order_by('-effective').first()
+
     return render(request, 'game/game.html', {
-        'game_name_json': mark_safe(json.dumps(game_name))
+        'game_name_json': mark_safe(json.dumps(game_name)),
+        'game_state_json': mark_safe(json.dumps(game_state.state))
     })
 
 # A whole game will be stored as a state in a JSON object
