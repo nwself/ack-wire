@@ -1,12 +1,13 @@
 import json
 import logging
 
+from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseBadRequest
 from django.shortcuts import render, get_object_or_404
 from django.utils.safestring import mark_safe
 
-from .models import Game
+from .models import Game, GameState, build_initial_state
 
 
 logger = logging.getLogger(__file__)
@@ -87,7 +88,7 @@ def game(request, game_name):
 # }
 
 
-def start_game(players):
+def start_game(game_slug, usernames):
     """Create a new game.
 
     Takes a list of players to put in this game.
@@ -102,7 +103,40 @@ def start_game(players):
     Save this initial state to the model.
     Notify all.
     """
-    pass
+    users = []
+    for username in usernames:
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            logger.error("User does not exist {}".format(username))
+            return None
+        users.append(user)
+
+    state = build_initial_state(users)
+
+    # Draw a tile for each player
+    initial_draws = [(player, draw_tile(state)) for player in state['players']]
+
+    # Order players by the tiles drawn
+    state['players'] = [x[0] for x in sorted(initial_draws, key=lambda x: x[1])]
+
+    # Place initial draws on board with chain = "island"
+    for draw in initial_draws:
+        state['hotels'][draw[1]] = 'island'
+
+    # Draw 6 tiles for each player
+    for player in state['players']:
+        player['tiles'] = [draw_tile(state) for _ in range(6)]
+
+    # Save game to database
+    game = Game.objects.create(name=game_slug)
+    for user in users:
+        game.users.add(user)
+    game.save()
+
+    # Save initial state to database
+    GameState.objects.create(game=game, state=json.dumps(state))
+    return state
 
 
 def notify_all(state):
@@ -257,7 +291,7 @@ def buy_stocks(request):
     pass
 
 
-def draw_tile(request):
+def draw_tile(state):
     """Draw a tile.
 
     Called from buy_stocks or merger determine_winner. Assumed to be correct thing to do.
@@ -266,7 +300,7 @@ def draw_tile(request):
     Remove that tile from supply.tiles
     Return drawn tile
     """
-    pass
+    return state['supply']['tiles'].pop()
 
 
 def start_merger_helper(state, cell):
