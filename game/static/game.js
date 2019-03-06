@@ -1,8 +1,73 @@
-// // game.js
+var chatSocket = new WebSocket(
+    'ws://' + window.location.host +
+    '/ws/chat/' + roomName + '/');
+
+chatSocket.onmessage = function(e) {
+    var data = JSON.parse(e.data);
+    console.log("socket message");
+    console.log(data);
+    // var message = data['message'];
+    // document.querySelector('#chat-log').value += (message + '\n');
+};
+
+chatSocket.onclose = function(e) {
+    console.error('Chat socket closed unexpectedly');
+};
+
+
 var app = {
     board: [],
     hand: [],
+    instruction: '',
+    play_tile: function () {
+        console.log(arguments);
+    }
 };
+
+
+var fsm = new machina.Fsm({
+    initialize: function(options) {
+        // your setup code goes here...
+    },
+    namespace: "acquire",
+    initialState: "uninitialized",
+    states: {
+        'uninitialized': {
+            // "*": function() {
+            //     this.deferUntilTransition();
+            //     this.transition( "green" );
+            // }
+        },
+        'play_tile': {
+            _onEnter: function() {
+                app.instruction = "Choose a tile to play.";
+            },
+
+            'tile_clicked': function (tile) {
+                console.log("Here in the FSM with this tile", tile);
+                chatSocket.send(JSON.stringify({
+                    action: 'play_tile',
+                    body: {
+                        tile: tile.coordinates
+                    }
+                }));
+            }
+        }
+    },
+
+    handleNewState: function (state) {
+        if (state.state.player == username) {
+            this.transition(state.state.state);
+        } else {
+            this.transition("waiting");
+            app.instruction = "Waiting for " + state.state.player + " to " + state.state.state;
+        }
+    },
+
+    tileClicked: function (tile) {
+        this.handle('tile_clicked', tile);
+    }
+});
 
 
 function Cell(obj) {
@@ -12,6 +77,16 @@ function Cell(obj) {
     if (this.chain) {
       console.log(this.coordinates, this.chain);
     }
+}
+
+
+function Tile(obj) {
+    this.coordinates = obj.coordinates;
+}
+
+Tile.prototype.play = function (event, model) {
+    console.log("Would like to play", model.tile.coordinates);
+    fsm.tileClicked(model.tile);
 }
 
 
@@ -35,11 +110,16 @@ var thisPlayer = state.players.filter(function (player) {
 
 if (thisPlayer.length !== 0) {
     thisPlayer = thisPlayer[0];
-    app.hand = thisPlayer.tiles.sort();
+    app.hand = thisPlayer.tiles.sort().map(function (coordinates) {
+        return new Tile({
+            coordinates: coordinates
+        });
+    });
 } else {
     thisPlayer = null;
 }
 
+fsm.handleNewState(state);
 
 document.addEventListener("DOMContentLoaded", function() {
     rivets.bind(document.getElementById("main"), {app: app});

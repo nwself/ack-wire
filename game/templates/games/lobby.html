@@ -9,7 +9,11 @@
 </head>
 <body>
   {% for game in current_games %}
-    <li><a href="{% url 'game-view' game.pk %}">{{ game.name }}</a></li>
+    <li><a href="{% url 'game-view' game.pk %}">{{ game.name }}, players [
+      {% for user in game.users.all %}
+        {{ user.username }},
+      {% endfor %}
+    ]</a></li>
   {% endfor %}
 </body>
 

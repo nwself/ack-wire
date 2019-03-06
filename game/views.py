@@ -25,7 +25,7 @@ def lobby(request):
 @login_required
 def game(request, game_pk):
     game = get_object_or_404(Game, pk=game_pk)
-    state = game.gamestate_set.all().order_by('-effective').first().get_state()
+    state = game.get_active_state()
 
     for player in state['players']:
         if player['username'] != request.user.username:
@@ -134,6 +134,7 @@ def start_game(game_slug, usernames):
 
     # Order players by the tiles drawn
     state['players'] = [x[0] for x in sorted(initial_draws, key=lambda x: x[1])]
+    state['state']['player'] = state['players'][0]['username']
 
     # Place initial draws on board with chain = "island"
     for draw in initial_draws:
@@ -179,53 +180,106 @@ def end_game(request):
     pass
 
 
-def play_tile(request):
+def play_tile(game_pk, user, tile):
     """Play a tile from a player hand to the board.
-
-    Will be called AJAXly
-
-    Accepts POST only with
-        request.user
-        game_id
-        tile to lay
-
-    So much to check:
-        Look for game_id in request.user.game_set
-        If not there:
-            Return 403
-
-        Does this player have this tile in hand? (if not => 403)
-        Is this tile a legal play?
-            already in hand implies that the space is free but it could be unplayable via safe chains
-            Check if this mergers safe chains
-            Check if this creates a chain when there are no chains available
-
-    If everything checks out
-        Place tile on board
-            Find cell in state.cells
-            Set active_cell to it
-            Check orthonal cells
-            If all have chain == None:
-                Set cell chain to island
-            If all have chain == None or chain == "island":
-                if there are available chains in the supply:
-                    Change state to declare_chain and return from here as normal
-                else:
-                    Return unplayable tile error
-            If all have chain == None or chain == some_chain:
-                Set cell chain to some_chain
-            if some have chain == chain1 and others chain == chain2:
-                if chain1 and chain2 are safe:
-                    This is an unplayable tile (do we auto-remove these?)
-                    Return unplayable tile error
-                else
-                    Change state to merger
-                    state = start_merger_helper(state, cell)
-
-    If state not yet changed, change to "buy_stocks"
-    Return new state and notify other players of state change! (sockets?)
     """
-    pass
+    # Check that this game exists and this user is in it
+    game = user.game_set.filter(pk=game_pk)
+    if not game.exists():
+        logger.error("{} not in game {}".format(user.username, game_pk))
+        return {
+            "status": 403
+        }  # who knows?
+    game = game[0]  # must be only one because pk is unique
+    state = game.get_active_state()
+
+    if state['state']['player'] != user.username:
+        logger.error('{} sent a play but it is not their turn'.format(user.username))
+        return {
+            "status": 403
+        }
+
+    # Get current player (safe because user must be in players since they are in this game)
+    # (unless coding error)
+    player = [p for p in state['players'] if p['username'] == user.username][0]
+
+    if tile not in player['tiles']:
+        logger.error("{} trying to play tile {} not in hand".format(user.username, tile))
+        return {
+            "status": 403
+        }
+
+    # Set active_cell (not sure why yet)
+    state['active_cell'] = tile
+    neighbors = get_neighboring_assignments(state, tile)
+
+    # Remove played tile from hand
+    player['tiles'].remove(tile)
+
+    if all([n is None for n in neighbors]):
+        # If all have chain == None:
+        state['hotels'][tile] = 'island'
+
+        if any([c for c in state['chains'] if state['chains'][c] > 0]):
+            state['state']['state'] = 'buy_stocks'
+        else:
+            player['tiles'].append(draw_tile(state))
+            state['state'] = {
+                'state': 'play_tile',
+                'player': next_player(state)
+            }
+    elif all([n is None or n == 'island' for n in neighbors]):
+        # If all have chain == None or chain == "island":
+        if any([c for c in state['chains'] if state['chains'][c] == 0]):
+            # If there are available chains in the supply
+            state['state']['state'] = 'declare_chain'
+            # return normally
+        else:
+            logger.error("{} plays {} to form chain but no available chains".format(user.username, tile))
+            return {
+                "status": 403
+            }
+    else:
+        # There must at least be one chain adjacent
+        neighboring_chains = set([n for n in neighbors if n is not None])
+        if len(neighboring_chains) == 1:
+            # If all have chain == None or chain == some_chain:
+            state['hotels'][tile] = neighboring_chains[0]
+        else:
+            # Check if this tile is unplayable (should probably be a helper function)
+            safe_neighbors = [n for n in neighboring_chains if state['chains'][n] >= 11]
+            if len(safe_neighbors) >= 2:
+                logger.error("Cannot play {} because 2+ neighboring chains are safe".format(tile))
+                return {
+                    "status": 403
+                }
+
+            # Change state to merger, no need 
+            state = start_merger_helper(state, neighboring_chains)
+
+    return state
+
+
+def next_player(state):
+    i = [p['username'] for p in state['players']].index(state['state']['player'])
+    return state['players'][(i + 1) % len(state['players'])]['username']
+
+
+def get_neighboring_tiles(tile):
+    neighboring_tiles = []
+    if tile[0] != "A":
+        neighboring_tiles.append(chr(ord(tile[0]) - 1) + tile[1:])
+    if tile[0] != "I":
+        neighboring_tiles.append(chr(ord(tile[0]) + 1) + tile[1:])
+    if tile[1:] != "1":
+        neighboring_tiles.append(tile[0] + str(int(tile[1:]) - 1))
+    if tile[1:] != "12":
+        neighboring_tiles.append(tile[0] + str(int(tile[1:]) + 1))
+    return neighboring_tiles
+
+
+def get_neighboring_assignments(state, tile):
+    return [state['hotels'][n] if n in state['hotels'] else None for n in get_neighboring_tiles(tile)]
 
 
 def declare_chain(request):
@@ -318,7 +372,7 @@ def draw_tile(state):
     return state['supply']['tiles'].pop()
 
 
-def start_merger_helper(state, cell):
+def start_merger_helper(state, merging_chains):
     """Check if winner chain can be auto-declared for a new merger.
 
     Called from play_tile if a merger has happened. Uses "active_cell" on state.

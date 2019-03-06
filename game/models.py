@@ -10,6 +10,9 @@ class Game(models.Model):
     name = models.SlugField(db_index=True)
     users = models.ManyToManyField(settings.AUTH_USER_MODEL)
 
+    def get_active_state(self):
+        return self.gamestate_set.all().order_by('-effective').first().get_state()
+
     def __str__(self):
         return self.name
 
@@ -54,7 +57,7 @@ def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=
         'game': "",  # the game_name slug
         'state': {
             'player': "",
-            'state': ""    # this is state.state.state which is a stupid thing to call something
+            'state': "play_tile"    # this is state.state.state which is a stupid thing to call something
         },
         'end_game': False     # used to end game when a player calls it
     }
