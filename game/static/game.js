@@ -1,4 +1,36 @@
 // // game.js
+var app = {
+    board: [],
+};
+
+
+function Cell(obj) {
+    this.coordinates = obj.coordinates;
+    this.chain = obj.chain;
+
+    if (this.chain) {
+      console.log(this.coordinates, this.chain);
+    }
+}
+
+
+var letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+for (var i = 0; i < letters.length; i++) {
+    var row = [];
+    for (var j = 0; j < 12; j++) {
+        var coordinates = letters[i] + (j + 1);
+        row.push(new Cell({
+            coordinates: coordinates,
+            chain: ((coordinates in state.hotels) ? state.hotels[coordinates] : null),
+        }));
+    }
+    app.board.push(row);
+}
+
+
+document.addEventListener("DOMContentLoaded", function() {
+    rivets.bind(document.getElementById("main"), {app: app});
+});
 
 // // represents the stata and is synced with/bound to the HTML rivets template
 // var app = {

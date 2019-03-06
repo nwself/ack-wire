@@ -1,11 +1,13 @@
 import json
 import logging
 
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseBadRequest
 from django.shortcuts import render, get_object_or_404
 from django.utils.safestring import mark_safe
+
 
 from .models import Game, GameState, build_initial_state
 
@@ -13,12 +15,20 @@ from .models import Game, GameState, build_initial_state
 logger = logging.getLogger(__file__)
 
 
-def game(request, game_name):
-    game = get_object_or_404(Game, name=game_name)
+@login_required
+def lobby(request):
+    return render(request, 'games/lobby.html', {
+        'current_games': request.user.game_set.all()
+    })
+
+
+@login_required
+def game(request, game_pk):
+    game = get_object_or_404(Game, pk=game_pk)
     game_state = game.gamestate_set.all().order_by('-effective').first()
 
-    return render(request, 'game/game.html', {
-        'game_name_json': mark_safe(json.dumps(game_name)),
+    return render(request, 'games/game.html', {
+        'game_name_json': mark_safe(json.dumps(game_pk)),
         'game_state_json': mark_safe(json.dumps(game_state.state))
     })
 

@@ -18,5 +18,5 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('<slug:game_name>', views.game)
+    path('<int:game_pk>', views.game, name='game-view')
 ]
