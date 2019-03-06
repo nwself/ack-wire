@@ -1,6 +1,7 @@
 // // game.js
 var app = {
     board: [],
+    hand: [],
 };
 
 
@@ -25,6 +26,18 @@ for (var i = 0; i < letters.length; i++) {
         }));
     }
     app.board.push(row);
+}
+
+
+var thisPlayer = state.players.filter(function (player) {
+    return player.username === username;
+});
+
+if (thisPlayer.length !== 0) {
+    thisPlayer = thisPlayer[0];
+    app.hand = thisPlayer.tiles.sort();
+} else {
+    thisPlayer = null;
 }
 
 

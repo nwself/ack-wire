@@ -1,3 +1,4 @@
+import json
 import random
 import string
 
@@ -21,6 +22,12 @@ class GameState(models.Model):
     effective = models.DateTimeField(auto_now_add=True)
 
     state = models.TextField()
+
+    def get_state(self):
+        return json.loads(self.state)
+
+    def __str__(self):
+        return "{} {}".format(self.game.name, self.effective)
 
 
 def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=25):

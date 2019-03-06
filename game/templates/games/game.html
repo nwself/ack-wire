@@ -21,6 +21,15 @@
       </tbody>
     </table>
   </div>
+  <div id="hand">
+    <table>
+      <tbody>
+      <tr>
+        <td rv-each-tile="app.hand">{ tile }</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
   <div id="supply">
     <div id="stocks">
       <div rv-each-chain="app.supply.stocks">
@@ -36,7 +45,8 @@
 
   <script type="text/javascript">
   var roomName = {{ game_name_json }};
-  var state = JSON.parse({{ game_state_json }});
+  var state = {{ game_state_json }};
+  var username = "{{ user.username }}";
 
   // var chatSocket = new WebSocket(
   //     'ws://' + window.location.host +

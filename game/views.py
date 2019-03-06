@@ -25,11 +25,16 @@ def lobby(request):
 @login_required
 def game(request, game_pk):
     game = get_object_or_404(Game, pk=game_pk)
-    game_state = game.gamestate_set.all().order_by('-effective').first()
+    state = game.gamestate_set.all().order_by('-effective').first().get_state()
+
+    for player in state['players']:
+        if player['username'] != request.user.username:
+            del player['tiles']
+    del state['supply']['tiles']
 
     return render(request, 'games/game.html', {
         'game_name_json': mark_safe(json.dumps(game_pk)),
-        'game_state_json': mark_safe(json.dumps(game_state.state))
+        'game_state_json': mark_safe(json.dumps(state))
     })
 
 # A whole game will be stored as a state in a JSON object
