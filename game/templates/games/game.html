@@ -40,11 +40,17 @@
     </table>
   </div>
 
+  <div id="shop">
+    <div id="chains" rv-show="app.showAvailableChains">
+      <ul>
+        <li rv-each-chain="app.availableChains" rv-on-click="chain.declare">{ chain.name }</li>
+      </ul>
+    </div>
+  </div>
+
   <div id="supply">
-    <div id="stocks">
-      <div rv-each-chain="app.supply.stocks">
-        <img src="" alt="">
-      </div>
+    <div id="chains">
+      
     </div>
   </div>
 

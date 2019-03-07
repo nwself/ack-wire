@@ -181,8 +181,7 @@ def end_game(request):
 
 
 def play_tile(game_pk, user, tile):
-    """Play a tile from a player hand to the board.
-    """
+    """Play a tile from a player hand to the board."""
     # Check that this game exists and this user is in it
     game = user.game_set.filter(pk=game_pk)
     if not game.exists():
@@ -199,6 +198,12 @@ def play_tile(game_pk, user, tile):
             "status": 403
         }
 
+    new_state = state__play_tile(state, user, tile)
+    GameState.objects.create(game=game, state=json.dumps(new_state))
+    return new_state
+
+
+def state__play_tile(state, user, tile):
     # Get current player (safe because user must be in players since they are in this game)
     # (unless coding error)
     player = [p for p in state['players'] if p['username'] == user.username][0]
@@ -254,7 +259,7 @@ def play_tile(game_pk, user, tile):
                     "status": 403
                 }
 
-            # Change state to merger, no need 
+            # Change state to merger
             state = start_merger_helper(state, neighboring_chains)
 
     return state

@@ -21,6 +21,7 @@ from game.views import lobby
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('accounts/', include('allauth.urls')),
     path('games/', include('game.urls')),
     path('', lobby, name='lobby')
 ]

@@ -1,11 +1,19 @@
+var fsm;
+
 var chatSocket = new WebSocket(
     'ws://' + window.location.host +
     '/ws/chat/' + roomName + '/');
 
 chatSocket.onmessage = function(e) {
     var data = JSON.parse(e.data);
-    console.log("socket message");
     console.log(data);
+
+    if ("status" in data) {
+        console.log("Possibly something has gone wrong");
+    } else {
+        fsm.handleNewState(data);
+    }
+
     // var message = data['message'];
     // document.querySelector('#chat-log').value += (message + '\n');
 };
@@ -52,21 +60,89 @@ var fsm = new machina.Fsm({
                     }
                 }));
             }
+        },
+        'declare_chain': {
+            _onEnter: function () {
+                app.instruction = "Name your newly formed chain.";
+
+                app.showAvailableChains = true;
+                app.availableChains = Object.keys(fsm.acquire.chains).map(function (chainName) {
+                    return new Chain({
+                        name: chainName,
+                        size: fsm.acquire.chains[chainName]
+                    });
+                }).filter(function (chain) {
+                    return chain.size == 0;
+                });
+            },
+
+            'chain_clicked': function (chain) {
+                console.log("Here in FSM with this chain", chain);
+                chatSocket.send(JSON.stringify({
+                    action: 'declare_chain',
+                    body: {
+                        chain: chain.name
+                    }
+                }));
+            },
+
+            _onExit: function () {
+                app.showAvailableChains = false;
+            }
         }
     },
 
-    handleNewState: function (state) {
-        if (state.state.player == username) {
-            this.transition(state.state.state);
+    handleNewState: function (acquire) {
+        fsm.acquire = acquire;
+
+        app.board = [];
+        app.hand = [];
+
+        var letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+        for (var i = 0; i < letters.length; i++) {
+            var row = [];
+            for (var j = 0; j < 12; j++) {
+                var coordinates = letters[i] + (j + 1);
+                row.push(new Cell({
+                    coordinates: coordinates,
+                    chain: ((coordinates in acquire.hotels) ? acquire.hotels[coordinates] : null),
+                }));
+            }
+            app.board.push(row);
+        }
+
+
+        var thisPlayer = acquire.players.filter(function (player) {
+            return player.username === username;
+        });
+
+        if (thisPlayer.length !== 0) {
+            thisPlayer = thisPlayer[0];
+            app.hand = thisPlayer.tiles.sort().map(function (coordinates) {
+                return new Tile({
+                    coordinates: coordinates
+                });
+            });
+        } else {
+            thisPlayer = null;
+        }
+
+
+        if (acquire.state.player == username) {
+            this.transition(acquire.state.state);
         } else {
             this.transition("waiting");
-            app.instruction = "Waiting for " + state.state.player + " to " + state.state.state;
+            app.instruction = "Waiting for " + acquire.state.player + " to " + acquire.state.state;
         }
+    },
+
+    chainClicked: function (chain) {
+        this.handle('chain_clicked', chain);
     },
 
     tileClicked: function (tile) {
         this.handle('tile_clicked', tile);
-    }
+    },
 });
 
 
@@ -90,36 +166,19 @@ Tile.prototype.play = function (event, model) {
 }
 
 
-var letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
-for (var i = 0; i < letters.length; i++) {
-    var row = [];
-    for (var j = 0; j < 12; j++) {
-        var coordinates = letters[i] + (j + 1);
-        row.push(new Cell({
-            coordinates: coordinates,
-            chain: ((coordinates in state.hotels) ? state.hotels[coordinates] : null),
-        }));
-    }
-    app.board.push(row);
+function Chain(obj) {
+    this.name = obj.name;
+    this.size = obj.size;
 }
 
-
-var thisPlayer = state.players.filter(function (player) {
-    return player.username === username;
-});
-
-if (thisPlayer.length !== 0) {
-    thisPlayer = thisPlayer[0];
-    app.hand = thisPlayer.tiles.sort().map(function (coordinates) {
-        return new Tile({
-            coordinates: coordinates
-        });
-    });
-} else {
-    thisPlayer = null;
+Chain.prototype.declare = function (event, model) {
+    console.log("Would like to declare", model.chain.name);
+    fsm.chainClicked(model.chain);
 }
+
 
 fsm.handleNewState(state);
+
 
 document.addEventListener("DOMContentLoaded", function() {
     rivets.bind(document.getElementById("main"), {app: app});

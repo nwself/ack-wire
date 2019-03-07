@@ -25,6 +25,7 @@ SECRET_KEY = '_g#wc@o0wrnaxrrb&y$u49*o2z48e^8b#a5k7r=f4=!3bo^&@='
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+SITE_ID = 1
 ALLOWED_HOSTS = []
 INTERNAL_IPS = ['127.0.0.1']
 
@@ -38,6 +39,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
     'debug_toolbar',
     'channels',
     'game',
@@ -71,6 +76,14 @@ TEMPLATES = [
         },
     },
 ]
+
+AUTHENTICATION_BACKENDS = (
+    # Needed to login by username in Django admin, regardless of `allauth`
+    'django.contrib.auth.backends.ModelBackend',
+
+    # `allauth` specific authentication methods, such as login by e-mail
+    'allauth.account.auth_backends.AuthenticationBackend',
+)
 
 # WSGI_APPLICATION = 'acquire.wsgi.application'
 ASGI_APPLICATION = 'acquire.routing.application'
