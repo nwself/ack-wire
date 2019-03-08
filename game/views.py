@@ -216,6 +216,18 @@ class PlayTileAction(Action):
         super(PlayTileAction, self).__init__(game_pk, user)
         self.tile = tile
 
+    def advance_state(self):
+        if any([c for c in self.state['chains'] if self.state['chains'][c] > 0]):
+            # If there are any active chains go to buy_stocks state
+            self.state['state']['state'] = 'buy_stocks'
+        else:
+            # There are no active chains so draw a tile and it's next player's turn
+            self.player['tiles'].append(draw_tile(self.state))
+            self.state['state'] = {
+                'state': 'play_tile',
+                'player': next_player(self.state)
+            }
+
     def process(self):
         state = self.state
         player = self.player
@@ -231,25 +243,19 @@ class PlayTileAction(Action):
         # Remove played tile from hand
         player['tiles'].remove(self.tile)
 
+        # TODO, handle tile adjacent to chain and island
+        # TODO, handle merger with adjacent island
+
         if all([n is None for n in neighbors]):
             # If all have chain == None:
             state['hotels'][self.tile] = 'island'
-
-            if any([c for c in state['chains'] if state['chains'][c] > 0]):
-                state['state']['state'] = 'buy_stocks'
-            else:
-                player['tiles'].append(draw_tile(state))
-                state['state'] = {
-                    'state': 'play_tile',
-                    'player': next_player(state)
-                }
+            self.advance_state()
         elif all([n is None or n == 'island' for n in neighbors]):
             # If all have chain == None or chain == "island":
             if any([c for c in state['chains'] if state['chains'][c] == 0]):
                 # If there are available chains in the supply
                 state['hotels'][self.tile] = 'island'
                 state['state']['state'] = 'declare_chain'
-                # return normally
             else:
                 logger.error("{} plays {} to form chain but no available chains".format(player['username'], self.tile))
                 return {
@@ -260,7 +266,8 @@ class PlayTileAction(Action):
             neighboring_chains = set([n for n in neighbors if n is not None])
             if len(neighboring_chains) == 1:
                 # If all have chain == None or chain == some_chain:
-                state['hotels'][self.tile] = neighboring_chains[0]
+                state['hotels'][self.tile] = neighboring_chains.pop()
+                self.advance_state()
             else:
                 # Check if this tile is unplayable (should probably be a helper function)
                 safe_neighbors = [n for n in neighboring_chains if state['chains'][n] >= 11]
@@ -316,10 +323,7 @@ class DeclareChainAction(Action):
         self.state['chains'][self.chain] = size
 
         #     Add one stock of declared chain to player's hand
-        if self.chain not in self.player['stocks']:
-            self.player['stocks'][self.chain] = 1
-        else:
-            self.player['stocks'][self.chain] += 1
+        self.player['stocks'][self.chain] += 1
 
         #     Subtract one stock from supply
         self.state['supply']['stocks'][self.chain] -= 1
@@ -330,6 +334,59 @@ class DeclareChainAction(Action):
         GameState.objects.create(game=self.game, state=json.dumps(self.state))
         return self.state
 
+
+class BuyStocksAction(Action):
+    def __init__(self, game_pk, user, stocks):
+        super(BuyStocksAction, self).__init__(game_pk, user)
+        self.stocks = stocks
+
+    def process(self):
+        #     Has this player asked for more than 3 stocks?
+        if len(self.stocks) > 3:
+            logger.error("{} buys more than 3 stocks {}".format(self.user, self.stocks))
+            raise ActionForbiddenException()
+        #     Are these stocks available in the supply?
+
+        #     Does this player have enough money to buy these stocks?
+
+        # If everything passes
+        #     Subtract from supply's stock counts
+        #     Add to players stock counts
+        #     Subtract correct amount from player's cash
+        for stock in self.stocks:
+            if self.state['supply']['stocks'][stock] == 0:
+                logger.error("{} buys a {} but supply is empty".format(self.user, stock))
+                raise ActionForbiddenException()
+
+            self.state['supply']['stocks'][stock] -= 1
+            self.player['stocks'][stock] += 1
+            self.player['cash'] -= get_stock_cost(self.state, stock)
+
+            if self.player['cash'] < 0:
+                logger.error("{} doesn't have enough money to buy {}".format(self.user, self.stocks))
+                raise ActionForbiddenException()
+
+        # # Draw Tile
+        # Call draw_tile
+        # Add drawn tile to players hand
+        self.player['tiles'].append(draw_tile(self.state))
+
+        # # End Turn
+        # If end_game flag is True
+        # Call end_game()  # who knows what goes here?
+        if self.state['end_game']:
+            print("Someone wants to end game here but it's not implemented")
+
+        # Else
+        # Set state to "play_tile,next_player()"  # where do we change state.current_player? maybe only need it globally for merging so merging_player?
+        # Notify other players
+        self.state['state'] = {
+            'state': 'play_tile',
+            'player': next_player(self.state)
+        }
+
+        GameState.objects.create(game=self.game, state=json.dumps(self.state))
+        return self.state
 
 # def play_tile(game_pk, user, tile):
 #     """Play a tile from a player hand to the board."""
@@ -374,6 +431,10 @@ def get_neighboring_tiles(tile):
 
 def get_neighboring_assignments(state, tile):
     return [state['hotels'][n] if n in state['hotels'] else None for n in get_neighboring_tiles(tile)]
+
+
+def get_stock_cost(state, chain):
+    return 200
 
 
 def declare_chain(game_pk, user, chain):

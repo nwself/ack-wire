@@ -4,7 +4,7 @@ import logging
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import JsonWebsocketConsumer
 
-from .views import PlayTileAction, DeclareChainAction, ActionForbiddenException
+from .views import PlayTileAction, DeclareChainAction, BuyStocksAction, ActionForbiddenException
 
 
 logger = logging.getLogger(__file__)
@@ -28,6 +28,9 @@ class GameConsumer(JsonWebsocketConsumer):
             elif content['action'] == 'declare_chain':
                 print("{} {} {}".format(self.game_pk, self.user, content['body']['chain']))
                 action = DeclareChainAction(self.game_pk, self.user, content['body']['chain'])
+            elif content['action'] == 'buy_stocks':
+                print("{} {} {}".format(self.game_pk, self.user, content['body']['stocks']))
+                action = BuyStocksAction(self.game_pk, self.user, content['body']['stocks'])
             else:
                 logger.error("In receive got unknown action {} body {}".format(content['action'], content['body']))
 

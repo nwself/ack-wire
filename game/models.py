@@ -41,8 +41,8 @@ def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=
         'chains': {c: 0 for c in chains},
         'hotels': {},   # will look like "A10": "Festival"
         'players': [{
-            'cash': 500,
-            'stocks': {},
+            'cash': 5000,
+            'stocks': {c: 0 for c in chains},
             'tiles': [],
             'username': user.username,
         } for user in users],       # clients shouldn't have all of this

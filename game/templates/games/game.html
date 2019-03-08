@@ -34,23 +34,61 @@
     <table>
       <tbody>
       <tr>
+        <th>Hand</th>
         <td rv-each-tile="app.hand" rv-on-click="tile.play">{ tile.coordinates }</td>
       </tr>
       </tbody>
     </table>
+    <table>
+      <tbody>
+      <tr>
+        <th>Stocks</th>
+        <td rv-each-stock="app.playerStocks">{ stock.count } { stock.name }</td>
+      </tr>
+      </tbody>
+    </table>
+    <p>Cash: ${ app.player.cash }</p>
   </div>
 
   <div id="shop">
-    <div id="chains" rv-show="app.showAvailableChains">
+    <div id="shop-chains" rv-show="app.showAvailableChains">
       <ul>
         <li rv-each-chain="app.availableChains" rv-on-click="chain.declare">{ chain.name }</li>
       </ul>
     </div>
+    <div id="shop-stocks" rv-show="app.showAvailableStocks">
+      <table>
+        <tbody>
+          <tr rv-each-stock="app.availableStocks">
+            <td>{ app.cartCount < stocksCart | call stock }</td>
+            <td>{ stock.name }</td>
+            <td>{ stock.cost }</td>
+            <td>${ app.lookupChainCost < stock.name | call }</td>
+            <td><button rv-on-click="stock.increment" rv-enabled="app.canAddStock < stocksCart | call stock">+</button>
+            <td><button rv-on-click="stock.decrement" rv-disabled="app.hasNone < stocksCart | call stock">-</button>
+          </div>
+        </tbody>
+      </table>
+      <div>
+        <p>
+          Total cost: ${ app.totalCost < stocksCart | call }
+        </p>
+        <button rv-on-click="app.buyStocks">Validate</button>
+      </div>
+    </div>
   </div>
 
   <div id="supply">
-    <div id="chains">
-      
+    <div id="supply-chains">
+      <p>Supply Stocks</p>
+      <table>
+        <tbody>
+        <tr rv-each-stock="app.supplyStocks">
+          <td>{ stock.count }</td>
+          <td>{ stock.name }</td>
+        </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 

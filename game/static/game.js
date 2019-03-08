@@ -22,13 +22,44 @@ chatSocket.onclose = function(e) {
     console.error('Chat socket closed unexpectedly');
 };
 
-
 var app = {
     board: [],
     hand: [],
+    playerStocks: [],    
     instruction: '',
+    stocksCart: [],
     play_tile: function () {
         console.log(arguments);
+    },
+    buyStocks: function () {
+        console.log(arguments);
+        fsm.buyStocks();
+    },
+    totalCost: function () {
+        return app.stocksCart.reduce(function (prev, stock) {
+            return prev + app.lookupChainCost(fsm.acquire, stock.name);
+        }, 0);
+    },
+    canAddStock: function (stock) {
+        return (app.stocksCart.length < 3) && 
+            (app.lookupChainCost(stock.name) + app.totalCost() <= app.player.cash);
+            // (app.supply.stocks[stock.name] )
+            // TODO also need to check that there are enough in the supply here
+    },
+    hasNone: function (stock) {
+        console.log("Computing hasNone for", stock);
+        return app.stocksCart.filter(function (s) {
+            return stock.name == s.name;
+        }).length == 0;
+    },
+    lookupChainCost: function(chainName) {
+
+        return 200;
+    },
+    cartCount: function (stock) {
+        return app.stocksCart.reduce(function (prev, s) {
+            return prev + ((s.name == stock.name) ? 1 : 0);
+        }, 0);
     }
 };
 
@@ -93,7 +124,38 @@ var fsm = new machina.Fsm({
         'buy_stocks': {
             _onEnter: function () {
                 app.instruction = "Buy stocks.";
+
+                app.stocksCart = [];
+                app.showAvailableStocks = true;
+                app.availableStocks = Object.keys(fsm.acquire.chains).filter(function (chainName) {
+                    return fsm.acquire.chains[chainName] > 0;
+                }).map(function (chainName) {
+                    return new Stock({
+                        name: chainName,
+                        available: fsm.acquire.supply.stocks[chainName],
+                    })
+                })
             },
+
+            'buy_stocks': function () {
+                var stocks = app.stocksCart.map(function (stock) {
+                    return stock.name;
+                });
+                console.log("Here in fsm buying stocks", stocks);
+                chatSocket.send(JSON.stringify({
+                    action: 'buy_stocks',
+                    body: {
+                        stocks: stocks
+                    }
+                }));
+            },
+
+            _onExit: function () {
+                app.showAvailableStocks = false;
+            }
+        },
+        'waiting': {
+
         }
     },
 
@@ -116,22 +178,36 @@ var fsm = new machina.Fsm({
             app.board.push(row);
         }
 
-
-        var thisPlayer = acquire.players.filter(function (player) {
+        app.player = acquire.players.filter(function (player) {
             return player.username === username;
         });
 
-        if (thisPlayer.length !== 0) {
-            thisPlayer = thisPlayer[0];
-            app.hand = thisPlayer.tiles.sort().map(function (coordinates) {
+        if (app.player.length !== 0) {
+            app.player = app.player[0];
+            app.hand = app.player.tiles.sort().map(function (coordinates) {
                 return new Tile({
                     coordinates: coordinates
                 });
             });
         } else {
-            thisPlayer = null;
+            app.player = null;
         }
 
+        app.playerStocks = Object.keys(app.player.stocks).filter(function (stockName) {
+            return app.player.stocks[stockName] > 0;
+        }).map(function (stockName) {
+            return {
+                name: stockName,
+                count: app.player.stocks[stockName]
+            };
+        });
+
+        app.supplyStocks = Object.keys(app.player.stocks).map(function (stockName) {
+            return {
+                name: stockName,
+                count: acquire.supply.stocks[stockName]
+            };
+        });
 
         if (acquire.state.player == username) {
             this.transition(acquire.state.state);
@@ -148,16 +224,16 @@ var fsm = new machina.Fsm({
     tileClicked: function (tile) {
         this.handle('tile_clicked', tile);
     },
+
+    buyStocks: function (tile) {
+        this.handle('buy_stocks');
+    },
 });
 
 
 function Cell(obj) {
     this.coordinates = obj.coordinates;
     this.chain = obj.chain;
-
-    if (this.chain) {
-      console.log(this.coordinates, this.chain);
-    }
 }
 
 
@@ -181,6 +257,35 @@ Chain.prototype.declare = function (event, model) {
     fsm.chainClicked(model.chain);
 }
 
+
+function Stock(obj) {
+    this.name = obj.name;
+    this.available = obj.available;
+}
+
+Stock.prototype.decrement = function (event, model) {
+    console.log("Would like to decrement", model.stock.name);
+    // fsm.chainClicked(model.chain);
+    var index = app.stocksCart.map(function (stock) {
+        return stock.name;
+    }).indexOf(model.stock.name);
+
+    if (index > -1) {
+      app.stocksCart.splice(index, 1);
+    }
+}
+Stock.prototype.increment = function (event, model) {
+    console.log("Would like to increment", model.stock.name);
+    // fsm.chainClicked(model.chain);
+    app.stocksCart.push(model.stock);
+    // app.stocksCart = [model.stock];
+}
+Stock.prototype.hasNone = function () {
+    var thisName = this.name;
+    return app.stocksCart.filter(function (stock) {
+        return stock.name == thisName;
+    }).length == 0;
+}
 
 fsm.handleNewState(state);
 
