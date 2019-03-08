@@ -10,3 +10,21 @@ td.Tower {
 td.Luxor {
   background-color: orange;
 }
+
+td.American {
+  background-color: blue;
+}
+
+td.Festival {
+  background-color: green;
+}
+td.Worldwide {
+  background-color: brown;
+  color: white;
+}
+td.Continental {
+  background-color: teal;
+}
+td.Imperial {
+  background-color: magenta;
+}
