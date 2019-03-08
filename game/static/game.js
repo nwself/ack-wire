@@ -89,6 +89,11 @@ var fsm = new machina.Fsm({
             _onExit: function () {
                 app.showAvailableChains = false;
             }
+        },
+        'buy_stocks': {
+            _onEnter: function () {
+                app.instruction = "Buy stocks.";
+            },
         }
     },
 

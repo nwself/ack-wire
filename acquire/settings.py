@@ -172,6 +172,11 @@ LOGGING = {
             'propagate': True,
             'level': 'DEBUG',
         },
+        'daphne': {
+            'handlers': ['django_file'],
+            'propagate': True,
+            'level': 'DEBUG',
+        },
         'game': {
             'handlers': ['django_file'],
             'propagate': True,

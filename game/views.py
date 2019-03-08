@@ -1,3 +1,4 @@
+import abc
 import json
 import logging
 
@@ -180,89 +181,177 @@ def end_game(request):
     pass
 
 
-def play_tile(game_pk, user, tile):
-    """Play a tile from a player hand to the board."""
-    # Check that this game exists and this user is in it
-    game = user.game_set.filter(pk=game_pk)
-    if not game.exists():
-        logger.error("{} not in game {}".format(user.username, game_pk))
-        return {
-            "status": 403
-        }  # who knows?
-    game = game[0]  # must be only one because pk is unique
-    state = game.get_active_state()
-
-    if state['state']['player'] != user.username:
-        logger.error('{} sent a play but it is not their turn'.format(user.username))
-        return {
-            "status": 403
-        }
-
-    new_state = state__play_tile(state, user, tile)
-    GameState.objects.create(game=game, state=json.dumps(new_state))
-    return new_state
+class ActionForbiddenException(Exception):
+    pass
 
 
-def state__play_tile(state, user, tile):
-    # Get current player (safe because user must be in players since they are in this game)
-    # (unless coding error)
-    player = [p for p in state['players'] if p['username'] == user.username][0]
+class Action(abc.ABC):
+    def __init__(self, game_pk, user):
+        self.game_pk = game_pk
+        self.user = user
 
-    if tile not in player['tiles']:
-        logger.error("{} trying to play tile {} not in hand".format(user.username, tile))
-        return {
-            "status": 403
-        }
+        game_query = user.game_set.filter(pk=game_pk)
+        if not game_query.exists():
+            logger.error("{} not in game {}".format(user.username, game_pk))
+            raise ActionForbiddenException()
 
-    # Set active_cell (not sure why yet)
-    state['active_cell'] = tile
-    neighbors = get_neighboring_assignments(state, tile)
+        self.game = game_query[0]  # must be only one because pk is unique
+        self.state = self.game.get_active_state()
 
-    # Remove played tile from hand
-    player['tiles'].remove(tile)
+        if self.state['state']['player'] != user.username:
+            logger.error('{} sent a play but it is not their turn'.format(user.username))
+            raise ActionForbiddenException()
 
-    if all([n is None for n in neighbors]):
-        # If all have chain == None:
-        state['hotels'][tile] = 'island'
+        # Get current player (safe because user must be in players since they are in this game)
+        # (unless coding error)
+        self.player = [p for p in self.state['players'] if p['username'] == user.username][0]
 
-        if any([c for c in state['chains'] if state['chains'][c] > 0]):
-            state['state']['state'] = 'buy_stocks'
-        else:
-            player['tiles'].append(draw_tile(state))
-            state['state'] = {
-                'state': 'play_tile',
-                'player': next_player(state)
-            }
-    elif all([n is None or n == 'island' for n in neighbors]):
-        # If all have chain == None or chain == "island":
-        if any([c for c in state['chains'] if state['chains'][c] == 0]):
-            # If there are available chains in the supply
-            state['state']['state'] = 'declare_chain'
-            # return normally
-        else:
-            logger.error("{} plays {} to form chain but no available chains".format(user.username, tile))
-            return {
-                "status": 403
-            }
-    else:
-        # There must at least be one chain adjacent
-        neighboring_chains = set([n for n in neighbors if n is not None])
-        if len(neighboring_chains) == 1:
-            # If all have chain == None or chain == some_chain:
-            state['hotels'][tile] = neighboring_chains[0]
-        else:
-            # Check if this tile is unplayable (should probably be a helper function)
-            safe_neighbors = [n for n in neighboring_chains if state['chains'][n] >= 11]
-            if len(safe_neighbors) >= 2:
-                logger.error("Cannot play {} because 2+ neighboring chains are safe".format(tile))
+    @abc.abstractmethod
+    def process(self):
+        pass
+
+
+class PlayTileAction(Action):
+    def __init__(self, game_pk, user, tile):
+        super(PlayTileAction, self).__init__(game_pk, user)
+        self.tile = tile
+
+    def process(self):
+        state = self.state
+        player = self.player
+
+        if self.tile not in player['tiles']:
+            logger.error("{} trying to play tile {} not in hand".format(player['username'], self.tile))
+            raise ActionForbiddenException()
+
+        # Set active_cell (not sure why yet)
+        state['active_cell'] = self.tile
+        neighbors = get_neighboring_assignments(state, self.tile)
+
+        # Remove played tile from hand
+        player['tiles'].remove(self.tile)
+
+        if all([n is None for n in neighbors]):
+            # If all have chain == None:
+            state['hotels'][self.tile] = 'island'
+
+            if any([c for c in state['chains'] if state['chains'][c] > 0]):
+                state['state']['state'] = 'buy_stocks'
+            else:
+                player['tiles'].append(draw_tile(state))
+                state['state'] = {
+                    'state': 'play_tile',
+                    'player': next_player(state)
+                }
+        elif all([n is None or n == 'island' for n in neighbors]):
+            # If all have chain == None or chain == "island":
+            if any([c for c in state['chains'] if state['chains'][c] == 0]):
+                # If there are available chains in the supply
+                state['hotels'][self.tile] = 'island'
+                state['state']['state'] = 'declare_chain'
+                # return normally
+            else:
+                logger.error("{} plays {} to form chain but no available chains".format(player['username'], self.tile))
                 return {
                     "status": 403
                 }
+        else:
+            # There must at least be one chain adjacent
+            neighboring_chains = set([n for n in neighbors if n is not None])
+            if len(neighboring_chains) == 1:
+                # If all have chain == None or chain == some_chain:
+                state['hotels'][self.tile] = neighboring_chains[0]
+            else:
+                # Check if this tile is unplayable (should probably be a helper function)
+                safe_neighbors = [n for n in neighboring_chains if state['chains'][n] >= 11]
+                if len(safe_neighbors) >= 2:
+                    logger.error("Cannot play {} because 2+ neighboring chains are safe".format(self.tile))
+                    return {
+                        "status": 403
+                    }
 
-            # Change state to merger
-            state = start_merger_helper(state, neighboring_chains)
+                # Change state to merger
+                state = start_merger_helper(state, neighboring_chains)
 
-    return state
+        GameState.objects.create(game=self.game, state=json.dumps(state))
+        return state
+
+
+class DeclareChainAction(Action):
+    def __init__(self, game_pk, user, chain):
+        super(DeclareChainAction, self).__init__(game_pk, user)
+        self.chain = chain
+
+    def process(self):
+        #     Is chain available?
+        if self.chain not in [c for c in self.state['chains'] if self.state['chains'][c] == 0]:
+            logger.error("{} tried to found already active chain {}".format(self.player['username'], self.chain))
+            raise ActionForbiddenException()
+
+        # If it checks out:
+        #     Use active_cell from state, set its chain to "chain"
+        self.state['hotels'][self.state['active_cell']] = self.chain
+
+        # Track size of new chain as we go
+        size = 1
+
+        #     Do a crazy search through the board to set all orthogonally adjacent "island" cells to "chain"
+        neighboring_hotels = [t for t in get_neighboring_tiles(self.state['active_cell']) if t in self.state['hotels'] and self.state['hotels'][t] == "island"]
+        while neighboring_hotels:
+            # Assign each hotel to chain
+            for hotel in neighboring_hotels:
+                self.state['hotels'][hotel] = self.chain
+                size += 1
+
+            # Pretty sure this converges, assuming that we are correctly forming a chain
+            # here which we don't check but play_tile does (hopefully correctly)
+            new_neighbors = []
+            for hotel in neighboring_hotels:
+                island_neighbors = [t for t in get_neighboring_tiles(hotel) if t in self.state['hotels'] and self.state['hotels'][t] == "island"]
+                new_neighbors += island_neighbors
+
+            neighboring_hotels = island_neighbors
+
+        # Set size of chain
+        self.state['chains'][self.chain] = size
+
+        #     Add one stock of declared chain to player's hand
+        if self.chain not in self.player['stocks']:
+            self.player['stocks'][self.chain] = 1
+        else:
+            self.player['stocks'][self.chain] += 1
+
+        #     Subtract one stock from supply
+        self.state['supply']['stocks'][self.chain] -= 1
+
+        # Set state to "buy_stocks" and notify all.
+        self.state['state']['state'] = 'buy_stocks'
+
+        GameState.objects.create(game=self.game, state=json.dumps(self.state))
+        return self.state
+
+
+# def play_tile(game_pk, user, tile):
+#     """Play a tile from a player hand to the board."""
+#     # Check that this game exists and this user is in it
+#     game = user.game_set.filter(pk=game_pk)
+#     if not game.exists():
+#         logger.error("{} not in game {}".format(user.username, game_pk))
+#         return {
+#             "status": 403
+#         }  # who knows?
+#     game = game[0]  # must be only one because pk is unique
+#     state = game.get_active_state()
+
+#     if state['state']['player'] != user.username:
+#         logger.error('{} sent a play but it is not their turn'.format(user.username))
+#         return {
+#             "status": 403
+#         }
+
+#     new_state = state__play_tile(state, user, tile)
+#     GameState.objects.create(game=game, state=json.dumps(new_state))
+#     return new_state
 
 
 def next_player(state):
@@ -287,7 +376,7 @@ def get_neighboring_assignments(state, tile):
     return [state['hotels'][n] if n in state['hotels'] else None for n in get_neighboring_tiles(tile)]
 
 
-def declare_chain(request):
+def declare_chain(game_pk, user, chain):
     """Set the chain for a newly created chain.
 
     Called AJAXly, client will know to prompt to pick a chain because play_tile set state to "declare_chain"
@@ -309,23 +398,24 @@ def declare_chain(request):
 
     Set state to "buy_stocks" and notify all.
     """
-    if 'game_id' not in request.POST or 'chain' not in request.POST:
-        return HttpResponseBadRequest()
+    # if 'game_id' not in request.POST or 'chain' not in request.POST:
+    #     return HttpResponseBadRequest()
 
-    game = request.user.game_set.filter(request.POST['game_id'])
-    if not game.exists():
-        raise PermissionDenied
+    # game = request.user.game_set.filter(request.POST['game_id'])
+    # if not game.exists():
+    #     raise PermissionDenied
 
-    state = json.loads(game.state)
+    # state = json.loads(game.state)
 
-    if request.POST['chain'] not in [chain for chain in state.chains if chain.size == 0]:
-        logger.debug("User {} attempted to declare unavailable chain {}".format(request.user, request.POST['chain']))
-        raise PermissionDenied
+    # if request.POST['chain'] not in [chain for chain in state.chains if chain.size == 0]:
+    #     logger.debug("User {} attempted to declare unavailable chain {}".format(request.user, request.POST['chain']))
+    #     raise PermissionDenied
 
-    state.active_cell.chain = request.POST['chain']
-    # do search here
+    # state.active_cell.chain = request.POST['chain']
+    # # do search here
 
-    notify_all(state)
+    # notify_all(state)
+    pass
 
 
 def buy_stocks(request):

@@ -1,9 +1,13 @@
 import json
+import logging
 
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import JsonWebsocketConsumer
 
-from .views import play_tile
+from .views import PlayTileAction, DeclareChainAction, ActionForbiddenException
+
+
+logger = logging.getLogger(__file__)
 
 
 class GameConsumer(JsonWebsocketConsumer):
@@ -15,16 +19,24 @@ class GameConsumer(JsonWebsocketConsumer):
     def receive_json(self, content):
         print(content)
 
-        new_state = {}
-        if content['action'] == 'play_tile':
-            print("{} {} {}".format(self.game_pk, self.user, content['body']['tile']))
-            new_state = play_tile(self.game_pk, self.user, content['body']['tile'])
-        else:
-            logger.error("In receive got unknown action {} body {}".format(content['action'], content['body']))
+        try:
+            action = None
+            if content['action'] == 'play_tile':
+                print("{} {} {}".format(self.game_pk, self.user, content['body']['tile']))
+                action = PlayTileAction(self.game_pk, self.user, content['body']['tile'])
+                # new_state = play_tile(self.game_pk, self.user, content['body']['tile'])
+            elif content['action'] == 'declare_chain':
+                print("{} {} {}".format(self.game_pk, self.user, content['body']['chain']))
+                action = DeclareChainAction(self.game_pk, self.user, content['body']['chain'])
+            else:
+                logger.error("In receive got unknown action {} body {}".format(content['action'], content['body']))
+
+            new_state = action.process() if action else {}
+        except ActionForbiddenException:
+            new_state = {"status": 403}
 
         print(new_state)
         self.send_json(new_state)
-
 
     def disconnect(self, close_code):
         print("Socket to {} closed".format(self.user))
