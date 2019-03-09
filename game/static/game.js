@@ -179,7 +179,7 @@ var fsm = new machina.Fsm({
                 app.instruction = "Dispose of stock in the defunct chain."
 
                 app.showDisposeStocks = true;
-                app.stockDisposer = new StockDisposer(state)
+                app.stockDisposer = new StockDisposer(fsm.acquire);
             },
 
             'dispose_stock': function (cart) {
