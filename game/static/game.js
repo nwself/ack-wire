@@ -22,18 +22,35 @@ chatSocket.onclose = function(e) {
     console.error('Chat socket closed unexpectedly');
 };
 
+function array_move(arr, old_index, new_index) {
+    if (new_index >= arr.length) {
+        var k = new_index - arr.length + 1;
+        while (k--) {
+            arr.push(undefined);
+        }
+    }
+    arr.splice(new_index, 0, arr.splice(old_index, 1)[0]);
+    return arr; // for testing
+};
+
+
 var app = {
     board: [],
     hand: [],
     playerStocks: [],    
     instruction: '',
     stocksCart: [],
+    showDisposeStocks: false,
+    stockDisposer: new StockDisposer({merging_chains: []}, "Luxor"), // need a dummy because rivets parses the whole thing on startup
     play_tile: function () {
         console.log(arguments);
     },
     buyStocks: function () {
         console.log(arguments);
         fsm.buyStocks();
+    },
+    determineWinner: function () {
+        fsm.determineWinner();
     },
     totalCost: function () {
         return app.stocksCart.reduce(function (prev, stock) {
@@ -42,15 +59,18 @@ var app = {
     },
     canAddStock: function (stock) {
         return (app.stocksCart.length < 3) && 
-            (app.lookupChainCost(stock.name) + app.totalCost() <= app.player.cash);
+            (app.lookupChainCost(stock.name) + app.totalCost() <= app.player.cash) &&
+            (fsm.acquire.supply.stocks[stock.name] > app.cartCount(stock));
             // (app.supply.stocks[stock.name] )
             // TODO also need to check that there are enough in the supply here
     },
     hasNone: function (stock) {
-        console.log("Computing hasNone for", stock);
         return app.stocksCart.filter(function (s) {
             return stock.name == s.name;
         }).length == 0;
+    },
+    isZero: function (number) {
+        return number == 0;
     },
     lookupChainCost: function(chainName) {
 
@@ -154,6 +174,83 @@ var fsm = new machina.Fsm({
                 app.showAvailableStocks = false;
             }
         },
+        'dispose_stock': {
+            _onEnter: function () {
+                app.instruction = "Dispose of stock in the defunct chain."
+
+                app.showDisposeStocks = true;
+                app.stockDisposer = new StockDisposer(state)
+            },
+
+            'dispose_stock': function (cart) {
+               console.log("Here in fsm disposing stocks", cart);
+               chatSocket.send(JSON.stringify({
+                   action: 'dispose_stocks',
+                   body: {
+                       cart: cart
+                   }
+               }));
+            },
+
+            _onExit: function () {
+                app.showDisposeStocks = false;
+            }
+        },
+        'determine_winner': {
+            _onEnter: function () {
+                app.instruction = "Determine winner of merger."
+
+                app.showDetermineWinner = true;
+                app.mergingChains = fsm.acquire.merging_chains.map(function (chainName, i) {
+                    return {
+                        order: i + 1,
+                        name: chainName,
+                        size: fsm.acquire.chains[chainName],
+                        canUp: function (chain) {
+                            var index = chain.order - 1;
+                            return index != 0 && app.mergingChains[index].size >= app.mergingChains[index-1].size;
+                        },
+                        up: function (event, model) {
+                            var index = model.chain.order - 1;
+                            var newChains = app.mergingChains.slice();
+                            array_move(newChains, index, index - 1);
+                            newChains[index].order++;
+                            newChains[index - 1].order--;
+                            app.mergingChains = newChains; 
+                        },
+                        canDown: function (chain) {
+                            var index = chain.order - 1;
+                            return index != app.mergingChains.length-1 && app.mergingChains[index].size <= app.mergingChains[index+1].size;
+                        },
+                        down: function (event, model) {
+                            var index = model.chain.order - 1;
+                            var newChains = app.mergingChains.slice();
+                            array_move(newChains, index, index + 1);
+                            newChains[index].order--;
+                            newChains[index + 1].order++;
+                            app.mergingChains = newChains;
+                        }
+                    }
+                });
+            },
+
+            'determine_winner': function () {
+                var winnerOrder = app.mergingChains.map(function (chain) {
+                    return chain.name;
+                });
+                console.log("Here in fsm determining winner", winnerOrder);
+                chatSocket.send(JSON.stringify({
+                    action: 'determine_winner',
+                    body: {
+                        chains: winnerOrder
+                    }
+                }));                
+            },
+
+            _onExit: function () {
+                app.showDetermineWinner = false;
+            }
+        },
         'waiting': {
 
         }
@@ -225,9 +322,17 @@ var fsm = new machina.Fsm({
         this.handle('tile_clicked', tile);
     },
 
-    buyStocks: function (tile) {
+    buyStocks: function () {
         this.handle('buy_stocks');
     },
+
+    disposeStock: function (cart) {
+        this.handle('dispose_stock', cart);
+    },
+
+    determineWinner: function (cart) {
+        this.handle('determine_winner');
+    }
 });
 
 
@@ -286,6 +391,48 @@ Stock.prototype.hasNone = function () {
         return stock.name == thisName;
     }).length == 0;
 }
+
+function StockDisposer(state) {
+    this.winnerChain = state.merging_chains[0];
+    this.defunctChain = state.merging_chains[state.merging_chains.length - 1];
+    this.state = state;
+    this.disposeCart = {
+        trade: 0,
+        sell: 0,
+    }
+}
+
+StockDisposer.prototype.tradeIncome = function () {
+    return this.disposeCart.trade / 2 + " " + this.state.merging_chains[0];
+}
+StockDisposer.prototype.sellIncome = function () {
+    return this.disposeCart.sell * app.lookupChainCost(this.defunctChain);
+}
+StockDisposer.prototype.keepCount = function () {
+    return app.player.stocks[this.defunctChain] - this.disposeCart.trade - this.disposeCart.sell;
+}
+StockDisposer.prototype.canTrade = function () {
+    return this.keepCount() >= 2;
+}
+StockDisposer.prototype.canSell = function () {
+    return this.keepCount() > 0;
+}
+StockDisposer.prototype.tradeIncrement = function (event, model) {
+    model.app.stockDisposer.disposeCart.trade += 2;
+}
+StockDisposer.prototype.tradeDecrement = function (event, model) {
+    model.app.stockDisposer.disposeCart.trade -= 2;
+}
+StockDisposer.prototype.sellIncrement = function (event, model) {
+    model.app.stockDisposer.disposeCart.sell += 1;
+}
+StockDisposer.prototype.sellDecrement = function (event, model) {
+    model.app.stockDisposer.disposeCart.sell -= 1;
+}
+StockDisposer.prototype.validate = function (event, model) {
+    fsm.disposeStock(model.app.stockDisposer.disposeCart);
+}
+
 
 fsm.handleNewState(state);
 

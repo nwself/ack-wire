@@ -204,7 +204,20 @@ class Action(abc.ABC):
 
         # Get current player (safe because user must be in players since they are in this game)
         # (unless coding error)
-        self.player = [p for p in self.state['players'] if p['username'] == user.username][0]
+        self.player = pluck_player(self.state, user.username)
+
+    def advance_to_buy_or_next(self):
+        if (any([c for c in self.state['chains'] if self.state['chains'][c] > 0]) and
+                min([get_stock_cost(self.state, c) for c in self.state['chains']]) < self.player['cash']):
+            # If there are any active chains go to buy_stocks state
+            self.state['state']['state'] = 'buy_stocks'
+        else:
+            # There are no active chains so draw a tile and it's next player's turn
+            self.player['tiles'].append(draw_tile(self.state))
+            self.state['state'] = {
+                'state': 'play_tile',
+                'player': next_player(self.state)
+            }
 
     @abc.abstractmethod
     def process(self):
@@ -215,18 +228,6 @@ class PlayTileAction(Action):
     def __init__(self, game_pk, user, tile):
         super(PlayTileAction, self).__init__(game_pk, user)
         self.tile = tile
-
-    def advance_state(self):
-        if any([c for c in self.state['chains'] if self.state['chains'][c] > 0]):
-            # If there are any active chains go to buy_stocks state
-            self.state['state']['state'] = 'buy_stocks'
-        else:
-            # There are no active chains so draw a tile and it's next player's turn
-            self.player['tiles'].append(draw_tile(self.state))
-            self.state['state'] = {
-                'state': 'play_tile',
-                'player': next_player(self.state)
-            }
 
     def process(self):
         state = self.state
@@ -249,7 +250,7 @@ class PlayTileAction(Action):
         if all([n is None for n in neighbors]):
             # If all have chain == None:
             state['hotels'][self.tile] = 'island'
-            self.advance_state()
+            self.advance_to_buy_or_next()
         elif all([n is None or n == 'island' for n in neighbors]):
             # If all have chain == None or chain == "island":
             if any([c for c in state['chains'] if state['chains'][c] == 0]):
@@ -263,11 +264,16 @@ class PlayTileAction(Action):
                 }
         else:
             # There must at least be one chain adjacent
-            neighboring_chains = set([n for n in neighbors if n is not None])
+            neighboring_chains = set([n for n in neighbors if n is not None and n != 'island'])
             if len(neighboring_chains) == 1:
-                # If all have chain == None or chain == some_chain:
-                state['hotels'][self.tile] = neighboring_chains.pop()
-                self.advance_state()
+                # If all have chain == None or chain == island or chain == some_chain:
+                size = 1
+                chain = neighboring_chains.pop()
+                state['hotels'][self.tile] = chain
+                if 'island' in neighbors:
+                    size += convert_islands(state, chain)
+                state['chains'][chain] += size
+                self.advance_to_buy_or_next()
             else:
                 # Check if this tile is unplayable (should probably be a helper function)
                 safe_neighbors = [n for n in neighboring_chains if state['chains'][n] >= 11]
@@ -277,8 +283,11 @@ class PlayTileAction(Action):
                         "status": 403
                     }
 
+                # Set current cell to island while merger is going on
+                state['hotels'][state['active_cell']] = 'island'
+
                 # Change state to merger
-                state = start_merger_helper(state, neighboring_chains)
+                start_merger_helper(state, neighboring_chains)
 
         GameState.objects.create(game=self.game, state=json.dumps(state))
         return state
@@ -303,21 +312,7 @@ class DeclareChainAction(Action):
         size = 1
 
         #     Do a crazy search through the board to set all orthogonally adjacent "island" cells to "chain"
-        neighboring_hotels = [t for t in get_neighboring_tiles(self.state['active_cell']) if t in self.state['hotels'] and self.state['hotels'][t] == "island"]
-        while neighboring_hotels:
-            # Assign each hotel to chain
-            for hotel in neighboring_hotels:
-                self.state['hotels'][hotel] = self.chain
-                size += 1
-
-            # Pretty sure this converges, assuming that we are correctly forming a chain
-            # here which we don't check but play_tile does (hopefully correctly)
-            new_neighbors = []
-            for hotel in neighboring_hotels:
-                island_neighbors = [t for t in get_neighboring_tiles(hotel) if t in self.state['hotels'] and self.state['hotels'][t] == "island"]
-                new_neighbors += island_neighbors
-
-            neighboring_hotels = island_neighbors
+        size += convert_islands(self.state, self.chain)
 
         # Set size of chain
         self.state['chains'][self.chain] = size
@@ -329,7 +324,8 @@ class DeclareChainAction(Action):
         self.state['supply']['stocks'][self.chain] -= 1
 
         # Set state to "buy_stocks" and notify all.
-        self.state['state']['state'] = 'buy_stocks'
+        # self.state['state']['state'] = 'buy_stocks'
+        self.advance_to_buy_or_next()
 
         GameState.objects.create(game=self.game, state=json.dumps(self.state))
         return self.state
@@ -388,6 +384,101 @@ class BuyStocksAction(Action):
         GameState.objects.create(game=self.game, state=json.dumps(self.state))
         return self.state
 
+
+class DisposeStockAction(Action):
+    def __init__(self, game_pk, user, cart):
+        super(DisposeStockAction, self).__init__(game_pk, user)
+        self.cart = cart
+
+    def process(self):
+        #     {"sell": 0, "trade": 4}  # rest are assumed "keep"
+
+        # So much to check:
+        #     Does this player have this much total stock in this chain
+        defunct_chain = self.state['merging_chains'][-1]
+        winner_chain = self.state['merging_chains'][0]
+
+        if self.player['stocks'][defunct_chain] < (self.cart['trade'] + self.cart['sell']):
+            logger.error("{} tries to dispose more shares than in hand {}".format(self.player['username'], self.cart))
+            raise ActionForbiddenException()
+        #     If trade, is trade count even?
+        if self.cart['trade'] % 2 != 0:
+            logger.error("{} sent odd trade count {}".format(self.player['username'], self.cart))
+            raise ActionForbiddenException()
+        #     If trade, is there enough in supply to trade for?
+        if self.cart['trade'] / 2 > self.state['supply']['stocks'][winner_chain]:
+            logger.error("{} trades for more than supply has {}".format(self.player['username'], self.cart))
+            raise ActionForbiddenException()
+
+        # If everything passes
+        #     Add sell * chain_value to player's cash
+        #     Add sell count to supply
+        #     Subtract player's count by sell count
+        self.player['cash'] += self.cart['sell'] * get_stock_cost(self.state, defunct_chain)
+        self.player['stocks'][defunct_chain] -= self.cart['sell']
+        self.state['supply']['stocks'][defunct_chain] += self.cart['sell']
+
+        #     Add trade / 2 shares of winner (merging_chains[0]) stock to player
+        #     Subtract trade shares from player
+        self.player['stocks'][winner_chain] += self.cart['trade'] / 2
+        self.player['stocks'][defunct_chain] -= self.cart['trade']
+        self.state['supply']['stocks'][defunct_chain] += self.cart['trade']
+
+        #     Anything left is kept by player
+
+        # find the next player with shares of defunct_chain or stop at merging_player
+        n_player = next_player(self.state)
+        self.state['state']['player'] = n_player
+
+        while (pluck_player(self.state, n_player)['stocks'][defunct_chain] == 0 and
+                n_player != self.state['merging_player']):
+            n_player = next_player(self.state)
+            self.state['state']['player'] = n_player
+
+        if n_player == self.state['merging_player']:
+            # if everyone has had a chance to dispose stock
+            self.state['merging_chains'] = self.state['merging_chains'][:-1]
+            if len(self.state['merging_chains']) > 1:
+                # If there is another merger to resolve
+                pay_bonuses(self.state)
+                self.state['state']['state'] = 'dispose_stock'
+            else:
+                # all merging is done
+                resolve_merge(self.state)
+                self.advance_to_buy_or_next()
+        else:
+            #     Set state to "dispose_stock,next_player_who_has_stock()"
+            self.state['state']['state'] = 'dispose_stock'
+
+        GameState.objects.create(game=self.game, state=json.dumps(self.state))
+        return self.state
+
+
+class DetermineWinnerAction(Action):
+    def __init__(self, game_pk, user, chains):
+        super(DetermineWinnerAction, self).__init__(game_pk, user)
+        self.chains = chains
+
+    def process(self):
+        # So much to check:
+        #     Does set(requested_order) == set(merging_chains from DB's copy of state)?
+        if set(self.chains) != set(self.state['merging_chains']):
+            logger.error("{} sends invalid chains to determin winner {}".format(self.player['username'], self.chains))
+            raise ActionForbiddenException()
+        #     Are any of the defunct chains in this order safe? Invalid if so
+        for chain in self.chains[1:]:
+            if self.state['chains'][chain] > 11:
+                logger.error("{} can not be defunct, it is safe".format(chain))
+                raise ActionForbiddenException()
+
+        # Call prepare_merger(requested_order)
+        self.state['merging_chains'] = self.chains
+        prepare_merger(self.state)
+
+        GameState.objects.create(game=self.game, state=json.dumps(self.state))
+        return self.state
+
+
 # def play_tile(game_pk, user, tile):
 #     """Play a tile from a player hand to the board."""
 #     # Check that this game exists and this user is in it
@@ -435,6 +526,26 @@ def get_neighboring_assignments(state, tile):
 
 def get_stock_cost(state, chain):
     return 200
+
+
+def convert_islands(state, chain):
+    size = 0
+    neighboring_hotels = [t for t in get_neighboring_tiles(state['active_cell']) if t in state['hotels'] and state['hotels'][t] == "island"]
+    while neighboring_hotels:
+        # Assign each hotel to chain
+        for hotel in neighboring_hotels:
+            state['hotels'][hotel] = chain
+            size += 1
+
+        # Pretty sure this converges, assuming that we are correctly forming a chain
+        # here which we don't check but play_tile does (hopefully correctly)
+        new_neighbors = []
+        for hotel in neighboring_hotels:
+            island_neighbors = [t for t in get_neighboring_tiles(hotel) if t in state['hotels'] and state['hotels'][t] == "island"]
+            new_neighbors += island_neighbors
+
+        neighboring_hotels = island_neighbors
+    return size
 
 
 def declare_chain(game_pk, user, chain):
@@ -547,10 +658,18 @@ def start_merger_helper(state, merging_chains):
     Else:
         Call prepare_merger
     """
-    pass
+    neighbors = set([c for c in get_neighboring_assignments(state, state['active_cell']) if c is not None and c != "island"])
+    state['merging_chains'] = sorted(list(neighbors), key=lambda x: state['chains'][x], reverse=True)
+
+    chain_sizes = [state['chains'][c] for c in state['merging_chains']]
+    if len(set(chain_sizes)) != len(chain_sizes):
+        # One or more chains have the same size
+        state['state']['state'] = 'determine_winner'
+    else:
+        prepare_merger(state)
 
 
-def prepare_merger(merging_order):
+def prepare_merger(state):
     """Modify state to start mergering.
 
     Set merging_chains on state to match requested order
@@ -559,7 +678,15 @@ def prepare_merger(merging_order):
     Call pay_bonuses (should pay for first merger)
     Set state to "dispose_loser,current_player"
     """
-    pass
+    state['defunct_chains'] = state['merging_chains'][1:]
+    state['merging_player'] = state['state']['player']
+
+    pay_bonuses(state)
+    state['state']['state'] = 'dispose_stock'
+
+
+def pluck_player(state, username):
+    return [p for p in state['players'] if p['username'] == username][0]
 
 
 def determine_winner(request):
@@ -607,7 +734,7 @@ def pay_bonuses(state):
         Else:
             Pay min to second
     """
-    pass
+    print("Need to implement pay_bonuses")
 
 
 def dispose_loser_stock(request):
@@ -658,17 +785,30 @@ def resolve_merge(state):
 
     Assumes this is called at the right time and is the right thing to do.
 
-    Winning chain is merging_chains[0]
-    Set active_cell to winning chain
-    For each cell on board:
-        If cell belongs to defunct chain
-            Set cell to winning chain
-
-    Add to size of winning chain the sizes of all defunct chains + 1
-    Set size of defunct chains to 0
-    Set defunct chains to []
-    Set merging chains to []
-
-    Set state to "buy_stock,merging_player"
     """
-    pass
+    #     Winning chain is merging_chains[0]
+    winner_chain = state['merging_chains'][0]
+
+    # Set active_cell to winning chain
+    state['hotels'][state['active_cell']] = winner_chain
+
+    # For each cell on board:
+    #     If cell belongs to defunct chain
+    #         Set cell to winning chain
+    for cell, chain in state['hotels'].items():
+        if chain in state['defunct_chains']:
+            state['hotels'][cell] = winner_chain
+
+    # Add to size of winning chain the sizes of all defunct chains + 1
+    # Set size of defunct chains to 0
+    size = 1
+    for defunct_chain in state['defunct_chains']:
+        size += state['chains'][defunct_chain]
+        state['chains'][defunct_chain] = 0
+
+    size += convert_islands(state, winner_chain)
+
+    # Set defunct chains to []
+    # Set merging chains to []
+    state['defunct_chains'] = []
+    state['merging_chains'] = []

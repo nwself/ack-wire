@@ -9,11 +9,15 @@
   <title>Acquire</title>
   <script src="{% static "vendor/js/lodash.min.js" %}"></script>
   <script src="{% static "vendor/js/machina.js" %}"></script>
-  <script src="{% static "vendor/js/rivets.js" %}"></script>
+  <script src="{% static "vendor/js/sightglass.js" %}"></script>
+  <script src="{% static "vendor/js/rivets.full.js" %}"></script>
   <link rel="stylesheet" href="{% static "css/game.css" %}">
 </head>
 <body>
 <main id="main">
+  <div>
+    { app.player.username }
+  </div>
   <div id="board">
     <table>
       <tbody>
@@ -51,6 +55,48 @@
   </div>
 
   <div id="shop">
+    <div id="determine-winner" rv-show="app.showDetermineWinner">
+      Choose order of merge.
+
+      <table>
+        <tbody>
+          <tr rv-each-chain="app.mergingChains">
+            <td>{ chain.order }</td>
+            <td>{ chain.name }</td>
+            <td>{ chain.size }</td>
+            <td><button rv-on-click="chain.up" rv-enabled="chain.canUp < order | call chain">up</button></td>
+            <td><button rv-on-click="chain.down" rv-enabled="chain.canDown < order | call chain">down</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <button rv-on-click="app.determineWinner">Validate</button>
+    </div>
+    <div id="dispose-stock" rv-show="app.showDisposeStocks">
+      { app.stockDisposer.winnerChain } wins the merger. { app.stockDisposer.defunctChain } is defunct.
+      <table>
+        <tbody>
+          <tr>
+            <th>Trade</th>
+            <td>{ app.stockDisposer.disposeCart.trade }</td>
+            <td><button rv-on-click="app.stockDisposer.tradeIncrement" rv-enabled="app.stockDisposer.canTrade < disposeCart.sell disposeCart.trade | call">+</button>
+            <td><button rv-on-click="app.stockDisposer.tradeDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.trade">-</button>
+            <td>{ app.stockDisposer.tradeIncome < disposeCart.trade | call }</td>
+          </tr>
+          <tr>
+            <th>Sell</th>
+            <td>{ app.stockDisposer.disposeCart.sell }</td>
+            <td><button rv-on-click="app.stockDisposer.sellIncrement" rv-enabled="app.stockDisposer.canSell < disposeCart.sell disposeCart.trade | call">+</button>
+            <td><button rv-on-click="app.stockDisposer.sellDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.sell">-</button>
+            <td>${ app.stockDisposer.sellIncome < disposeCart.sell | call }</td>
+          </tr>
+          <tr>
+            <th>Keep</th>
+            <td>{ app.stockDisposer.keepCount < disposeCart.sell disposeCart.trade | call }</td>
+          </tr>
+        </tbody>
+      </table>
+      <button rv-on-click="app.stockDisposer.validate">Validate</button>
+    </div>
     <div id="shop-chains" rv-show="app.showAvailableChains">
       <ul>
         <li rv-each-chain="app.availableChains" rv-on-click="chain.declare">{ chain.name }</li>
