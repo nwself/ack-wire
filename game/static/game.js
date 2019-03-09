@@ -412,7 +412,7 @@ StockDisposer.prototype.keepCount = function () {
     return app.player.stocks[this.defunctChain] - this.disposeCart.trade - this.disposeCart.sell;
 }
 StockDisposer.prototype.canTrade = function () {
-    return this.keepCount() >= 2;
+    return this.keepCount() >= 2 && fsm.acquire.supply.stocks[this.winnerChain] > this.disposeCart.trade / 2;
 }
 StockDisposer.prototype.canSell = function () {
     return this.keepCount() > 0;

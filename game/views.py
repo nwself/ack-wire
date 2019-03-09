@@ -422,6 +422,7 @@ class DisposeStockAction(Action):
         #     Subtract trade shares from player
         self.player['stocks'][winner_chain] += self.cart['trade'] / 2
         self.player['stocks'][defunct_chain] -= self.cart['trade']
+        self.state['supply']['stocks'][winner_chain] -= self.cart['trade'] / 2
         self.state['supply']['stocks'][defunct_chain] += self.cart['trade']
 
         #     Anything left is kept by player
