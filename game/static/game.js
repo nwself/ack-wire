@@ -33,6 +33,7 @@ function array_move(arr, old_index, new_index) {
     return arr; // for testing
 };
 
+var stockCosts = [200, 200, 200, 300, 400, 500, 600, 600, 600, 600, 600, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 1000];
 
 var app = {
     board: [],
@@ -41,7 +42,7 @@ var app = {
     instruction: '',
     stocksCart: [],
     showDisposeStocks: false,
-    stockDisposer: new StockDisposer({merging_chains: []}, "Luxor"), // need a dummy because rivets parses the whole thing on startup
+    stockDisposer: new StockDisposer({merging_chains: ["Luxor"]}), // need a dummy because rivets parses the whole thing on startup
     play_tile: function () {
         console.log(arguments);
     },
@@ -54,7 +55,7 @@ var app = {
     },
     totalCost: function () {
         return app.stocksCart.reduce(function (prev, stock) {
-            return prev + app.lookupChainCost(fsm.acquire, stock.name);
+            return prev + app.lookupChainCost(stock.name);
         }, 0);
     },
     canAddStock: function (stock) {
@@ -73,8 +74,20 @@ var app = {
         return number == 0;
     },
     lookupChainCost: function(chainName) {
+        var count = fsm.acquire.chains[chainName];
 
-        return 200;
+        if (count > 41) {
+            count = 41;
+        }
+
+        var initial = stockCosts[count];
+
+        if (chainName === "American" || chainName === "Worldwide" || chainName === "Festival") {
+            return initial + 100;
+        } else if (chainName === "Imperial" || chainName === "Continental") {
+            return initial + 200;
+        }
+        return initial;
     },
     cartCount: function (stock) {
         return app.stocksCart.reduce(function (prev, s) {
@@ -153,6 +166,7 @@ var fsm = new machina.Fsm({
                     return new Stock({
                         name: chainName,
                         available: fsm.acquire.supply.stocks[chainName],
+                        size: fsm.acquire.chains[chainName]
                     })
                 })
             },
@@ -366,6 +380,7 @@ Chain.prototype.declare = function (event, model) {
 function Stock(obj) {
     this.name = obj.name;
     this.available = obj.available;
+    this.size = obj.size;
 }
 
 Stock.prototype.decrement = function (event, model) {

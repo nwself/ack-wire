@@ -108,8 +108,8 @@
           <tr rv-each-stock="app.availableStocks">
             <td>{ app.cartCount < stocksCart | call stock }</td>
             <td>{ stock.name }</td>
-            <td>{ stock.cost }</td>
-            <td>${ app.lookupChainCost < stock.name | call }</td>
+            <td>${ app.lookupChainCost | call stock.name }</td>
+            <td>{ stock.size }</td>
             <td><button rv-on-click="stock.increment" rv-enabled="app.canAddStock < stocksCart | call stock">+</button>
             <td><button rv-on-click="stock.decrement" rv-disabled="app.hasNone < stocksCart | call stock">-</button>
           </div>

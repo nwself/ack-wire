@@ -1,6 +1,8 @@
 import abc
 import json
+import math
 import logging
+import random
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
@@ -525,8 +527,22 @@ def get_neighboring_assignments(state, tile):
     return [state['hotels'][n] if n in state['hotels'] else None for n in get_neighboring_tiles(tile)]
 
 
+costs = [200, 200, 200, 300, 400, 500, 600, 600, 600, 600, 600, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 1000]
+
+
 def get_stock_cost(state, chain):
-    return 200
+    count = state['chains'][chain]
+
+    if count > 41:
+        count = 41
+
+    initial = costs[count]
+
+    if chain == "American" or chain == "Worldwide" or chain == "Festival":
+        return initial + 100
+    elif chain == "Imperial" or chain == "Continental":
+        return initial + 200
+    return initial
 
 
 def convert_islands(state, chain):
@@ -735,7 +751,44 @@ def pay_bonuses(state):
         Else:
             Pay min to second
     """
-    print("Need to implement pay_bonuses")
+    defunct_chain = state['merging_chains'][-1]
+    majority_bonus = get_stock_cost(state, defunct_chain) * 10
+    minority_bonus = majority_bonus / 2
+
+    stock_holders = [p for p in state['players'] if p['stocks'][defunct_chain] > 0]
+
+    if len(state['players']) == 2:
+        tile = state['supply']['tiles'][random.randint(0, len(state['supply']['tiles']))]
+        stock_holders.append({
+            'username': None,
+            'stocks': {
+                defunct_chain: int(tile[1:])
+            },
+            'cash': 0
+        })
+
+    stock_holders.sort(key=lambda x: x['stocks'][defunct_chain], reverse=True)
+
+    equal_to_first = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[0]['stocks'][defunct_chain]]
+    if len(equal_to_first) != 1:
+        # split bonus
+        bonus = (majority_bonus + minority_bonus) / len(equal_to_first)
+        # round to nearest $100
+        bonus = int(math.ceil(bonus / 100.0)) * 100
+        for p in equal_to_first:
+            p['cash'] += bonus
+    else:
+        stock_holders[0]['cash'] += majority_bonus
+
+        equal_to_second = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[1]['stocks'][defunct_chain]]
+        if len(equal_to_second) != 1:
+            bonus = minority_bonus / len(equal_to_second)
+            # round to nearest $100
+            bonus = int(math.ceil(bonus / 100.0)) * 100
+            for p in equal_to_second:
+                p['cash'] += bonus
+        else:
+            stock_holders[1]['cash'] += minority_bonus
 
 
 def dispose_loser_stock(request):
@@ -808,6 +861,7 @@ def resolve_merge(state):
         state['chains'][defunct_chain] = 0
 
     size += convert_islands(state, winner_chain)
+    state['chains'][winner_chain] += size
 
     # Set defunct chains to []
     # Set merging chains to []
