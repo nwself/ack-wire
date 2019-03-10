@@ -316,7 +316,8 @@ var fsm = new machina.Fsm({
         app.supplyStocks = Object.keys(app.player.stocks).map(function (stockName) {
             return {
                 name: stockName,
-                count: acquire.supply.stocks[stockName]
+                count: acquire.supply.stocks[stockName],
+                chainSize: acquire.chains[stockName]
             };
         });
 

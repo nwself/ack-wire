@@ -128,10 +128,20 @@
     <div id="supply-chains">
       <p>Supply Stocks</p>
       <table>
+        <thead>
+          <tr>
+            <td></td>
+            <td>Shares</td>
+            <td>Size</td>
+            <td>Cost</td>
+          </tr>
+        </thead>
         <tbody>
         <tr rv-each-stock="app.supplyStocks">
-          <td>{ stock.count }</td>
           <td>{ stock.name }</td>
+          <td>{ stock.count }</td>
+          <td>{ stock.chainSize }</td>
+          <td>${ app.lookupChainCost | call stock.name }</td>
         </tr>
         </tbody>
       </table>
