@@ -42,6 +42,8 @@ var app = {
     instruction: '',
     stocksCart: [],
     showDisposeStocks: false,
+    gameEnded: false,
+    showEndGame: false,
     stockDisposer: new StockDisposer({merging_chains: ["Luxor"]}), // need a dummy because rivets parses the whole thing on startup
     play_tile: function () {
         console.log(arguments);
@@ -93,6 +95,9 @@ var app = {
         return app.stocksCart.reduce(function (prev, s) {
             return prev + ((s.name == stock.name) ? 1 : 0);
         }, 0);
+    },
+    endGame: function () {
+        fsm.endGame();
     }
 };
 
@@ -258,11 +263,23 @@ var fsm = new machina.Fsm({
                     body: {
                         chains: winnerOrder
                     }
-                }));                
+                }));
             },
 
             _onExit: function () {
                 app.showDetermineWinner = false;
+            }
+        },
+        'end_game': {
+            _onEnter: function () {
+                var instruction = "Game over."
+                fsm.acquire.players.sort(function (a, b) {
+                    return b.cash - a.cash;
+                })
+                fsm.acquire.players.forEach(function (player) {
+                    instruction += " " + player.username + " : $" + player.cash;
+                });
+                app.instruction = instruction;
             }
         },
         'waiting': {
@@ -321,12 +338,29 @@ var fsm = new machina.Fsm({
             };
         });
 
-        if (acquire.state.player == username) {
+        app.history = acquire.history;
+
+        if (acquire.state.player == username || acquire.state.player == '') {
             this.transition(acquire.state.state);
         } else {
             this.transition("waiting");
             app.instruction = "Waiting for " + acquire.state.player + " to " + acquire.state.state;
         }
+
+        fsm.checkForEnd();
+    },
+
+    checkForEnd: function () {
+        var allSafe = Object.keys(fsm.acquire.chains).reduce(function (prev, chainName) {
+            return prev && (fsm.acquire.chains[chainName] >= 11 || fsm.acquire.chains[chainName == 0]);
+        });
+        var over41 = Object.keys(fsm.acquire.chains).reduce(function (prev, chainName) {
+            return prev || fsm.acquire.chains[chainName] >= 41;
+        });
+        if (allSafe || over41) {
+            app.showEndGame = true;
+        }
+        app.gameEnded = fsm.acquire.end_game;
     },
 
     chainClicked: function (chain) {
@@ -347,6 +381,14 @@ var fsm = new machina.Fsm({
 
     determineWinner: function (cart) {
         this.handle('determine_winner');
+    },
+
+    endGame: function () {
+        console.log("Calling for end of game");
+        chatSocket.send(JSON.stringify({
+            action: 'end_game',
+            body: {}
+        }));
     }
 });
 
@@ -450,8 +492,18 @@ StockDisposer.prototype.validate = function (event, model) {
 }
 
 
-fsm.handleNewState(state);
+fsm.handleNewState(initialStateJson);
 
+rivets.formatters.historyFormatter = function(value){
+  // if (value[0] == "initial_draws") {
+  //     return "Initial draws"
+  // }
+  if (value[0] == "dispose_stock") {
+      // dispose_stock,admin,Imperial,[object Object],2
+      return "dispose_stock," + value[1] + "," + value[2] + ",trade:" + value[3].trade + ",sell:" + value[3].sell + ",keep:" + value[4];
+  }
+  return value;
+}
 
 document.addEventListener("DOMContentLoaded", function() {
     rivets.bind(document.getElementById("main"), {app: app});

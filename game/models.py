@@ -59,7 +59,8 @@ def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=
             'player': "",
             'state': "play_tile"    # this is state.state.state which is a stupid thing to call something
         },
-        'end_game': False     # used to end game when a player calls it
+        'end_game': False,     # used to end game when a player calls it
+        'history': []
     }
     random.shuffle(initial_state['supply']['tiles'])
     return initial_state

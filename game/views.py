@@ -134,10 +134,16 @@ def start_game(game_slug, usernames):
 
     # Draw a tile for each player
     initial_draws = [(player, draw_tile(state)) for player in state['players']]
+    initial_draws.sort(key=lambda x: x[1])
 
     # Order players by the tiles drawn
-    state['players'] = [x[0] for x in sorted(initial_draws, key=lambda x: x[1])]
+    state['players'] = [x[0] for x in initial_draws]
     state['state']['player'] = state['players'][0]['username']
+
+    state['history'].append([
+        'initial_draws',
+        [[x[0]['username'], x[1]] for x in initial_draws]
+    ])
 
     # Place initial draws on board with chain = "island"
     for draw in initial_draws:
@@ -168,21 +174,6 @@ def notify_all(state):
     pass
 
 
-def end_game(request):
-    """Set the end game flag on the state to end the game after the current turn.
-
-    Will be called AJAXly
-
-    So much to check:
-        Look for game_id in request.user.game_set
-
-    Check that either one chain has >=41 hotels or all active chains are safe
-        If so set end_game flag on state
-        Else => 403
-    """
-    pass
-
-
 class ActionForbiddenException(Exception):
     pass
 
@@ -195,12 +186,18 @@ class Action(abc.ABC):
         game_query = user.game_set.filter(pk=game_pk)
         if not game_query.exists():
             logger.error("{} not in game {}".format(user.username, game_pk))
+            print("{} not in game {}".format(user.username, game_pk))
             raise ActionForbiddenException()
 
         self.game = game_query[0]  # must be only one because pk is unique
         self.state = self.game.get_active_state()
 
+        if self.state['state']['state'] == 'end_game':
+            logger.error('{} sent a play but game is over'.format(user.username))
+            raise ActionForbiddenException()
+
         if self.state['state']['player'] != user.username:
+            print('{} sent a play but it is not their turn'.format(user.username))
             logger.error('{} sent a play but it is not their turn'.format(user.username))
             raise ActionForbiddenException()
 
@@ -208,18 +205,103 @@ class Action(abc.ABC):
         # (unless coding error)
         self.player = pluck_player(self.state, user.username)
 
+    # def advance_to_dispose_stock(self):
+    #     return state['state']['state'] = 'dispose_stock'
+
+    def advance_to_next_dispose_stock(self):
+        # called by prepare_merger after pay_bonuses
+        # and recursively after pay_bonuses for queued merger
+        defunct_chain = self.state['merging_chains'][-1]
+
+        # find the next player with shares of defunct_chain or stop at merging_player
+        n_player = next_player(self.state)
+        self.state['state']['player'] = n_player
+
+        while (pluck_player(self.state, n_player)['stocks'][defunct_chain] == 0 and
+                n_player != self.state['merging_player']):
+            n_player = next_player(self.state)
+            self.state['state']['player'] = n_player
+
+        # after while loop, state.state.player will be either
+        #   the next player with shares of defunct_chain
+        #   merging_player which means we are done with *this* merger
+        if n_player == self.state['merging_player']:
+            # if everyone has had a chance to dispose stock
+            # remove the current loser from merging_chains
+            self.state['merging_chains'] = self.state['merging_chains'][:-1]
+            if len(self.state['merging_chains']) > 1:
+                # If there is another merger to resolve
+                pay_bonuses(self.state)
+                if pluck_player(self.state, n_player)['stocks'][self.state['merging_chains'][-1]] > 0:
+                    self.state['state']['state'] = 'dispose_stock'
+                else:
+                    self.advance_to_next_dispose_stock()
+            else:
+                # all merging is done
+                resolve_merge(self.state)
+                self.advance_to_buy_or_next()
+        else:
+            # another player needs to dispose stock of loser
+            self.state['state']['state'] = 'dispose_stock'
+
     def advance_to_buy_or_next(self):
         if (any([c for c in self.state['chains'] if self.state['chains'][c] > 0]) and
-                min([get_stock_cost(self.state, c) for c in self.state['chains']]) < self.player['cash']):
-            # If there are any active chains go to buy_stocks state
+                min([get_stock_cost(self.state, c) for c in self.state['chains']]) <= self.player['cash']):
+            # If there are any active chains and player has enough cash go to buy_stocks state
             self.state['state']['state'] = 'buy_stocks'
         else:
-            # There are no active chains so draw a tile and it's next player's turn
-            self.player['tiles'].append(draw_tile(self.state))
-            self.state['state'] = {
-                'state': 'play_tile',
-                'player': next_player(self.state)
-            }
+            if self.state['end_game']:
+                self.end_game()
+                return self.state
+            else:
+                # There are no active chains so draw a tile and it's next player's turn
+                self.player['tiles'].append(draw_tile(self.state))
+                self.state['state'] = {
+                    'state': 'play_tile',
+                    'player': next_player(self.state)
+                }
+
+    def prepare_merger(self, state):
+        """Modify state to start mergering.
+
+        Set merging_chains on state to match requested order
+        Set defunct_chains to merging_chains[1:]
+
+        Call pay_bonuses (should pay for first merger)
+        Set state to "dispose_loser,current_player"
+        """
+        state['defunct_chains'] = state['merging_chains'][1:]
+        state['merging_player'] = state['state']['player']
+
+        state['history'].append([
+            'prepare_merger',
+            state['merging_player'],
+            [[c, state['chains'][c]] for c in state['merging_chains']]
+        ])
+
+        pay_bonuses(state)
+        if pluck_player(state, state['state']['player'])['stocks'][state['merging_chains'][-1]] > 0:
+            state['state']['state'] = 'dispose_stock'
+        else:
+            self.advance_to_next_dispose_stock()
+
+    def end_game(self):
+        # Payout final bonuses
+        # Convert shares to cash
+        # Add up cash
+        active_chains = [c for c in self.state['chains'] if self.state['chains'][c] > 0]
+        for chain in active_chains:
+            self.state['merging_chains'] = [chain]
+            pay_bonuses(self.state)
+
+        for chain in active_chains:
+            for player in self.state['players']:
+                player['cash'] += player['stocks'][chain] * get_stock_cost(self.state, chain)
+
+        self.state['state']['state'] = 'end_game'
+        self.state['state']['player'] = ''
+
+        GameState.objects.create(game=self.game, state=json.dumps(self.state))
 
     @abc.abstractmethod
     def process(self):
@@ -231,6 +313,35 @@ class PlayTileAction(Action):
         super(PlayTileAction, self).__init__(game_pk, user)
         self.tile = tile
 
+    def start_merger_helper(self, state, merging_chains):
+        """Check if winner chain can be auto-declared for a new merger.
+
+        Called from play_tile if a merger has happened. Uses "active_cell" on state.
+
+        Assuming that merger is valid and there are not two safe chains involved.
+
+        Determine merging chains
+            Find chains of orthogonally adjacent cells
+
+        Add "merging_chains" to state from highest to lowest size
+        First in list will be winner and last will be smallest/first loser
+
+        If any two chains have the same size
+            Set state to "determine_winner_chain"
+            Client can prompt using "merging_chains" on state
+        Else:
+            Call prepare_merger
+        """
+        neighbors = set([c for c in get_neighboring_assignments(state, state['active_cell']) if c is not None and c != "island"])
+        state['merging_chains'] = sorted(list(neighbors), key=lambda x: state['chains'][x], reverse=True)
+
+        chain_sizes = [state['chains'][c] for c in state['merging_chains']]
+        if len(set(chain_sizes)) != len(chain_sizes):
+            # One or more chains have the same size
+            state['state']['state'] = 'determine_winner'
+        else:
+            self.prepare_merger(state)
+
     def process(self):
         state = self.state
         player = self.player
@@ -239,31 +350,28 @@ class PlayTileAction(Action):
             logger.error("{} trying to play tile {} not in hand".format(player['username'], self.tile))
             raise ActionForbiddenException()
 
-        # Set active_cell (not sure why yet)
+        # Set active_cell
         state['active_cell'] = self.tile
         neighbors = get_neighboring_assignments(state, self.tile)
 
         # Remove played tile from hand
         player['tiles'].remove(self.tile)
 
-        # TODO, handle tile adjacent to chain and island
-        # TODO, handle merger with adjacent island
-
+        history_added = False
         if all([n is None for n in neighbors]):
-            # If all have chain == None:
+            # if no neigboring hotels
             state['hotels'][self.tile] = 'island'
             self.advance_to_buy_or_next()
         elif all([n is None or n == 'island' for n in neighbors]):
-            # If all have chain == None or chain == "island":
+            # if there are only island hotels adjacent
             if any([c for c in state['chains'] if state['chains'][c] == 0]):
                 # If there are available chains in the supply
                 state['hotels'][self.tile] = 'island'
                 state['state']['state'] = 'declare_chain'
             else:
+                # TODO client need to prevent user from forming chains with no chains available
                 logger.error("{} plays {} to form chain but no available chains".format(player['username'], self.tile))
-                return {
-                    "status": 403
-                }
+                raise ActionForbiddenException()
         else:
             # There must at least be one chain adjacent
             neighboring_chains = set([n for n in neighbors if n is not None and n != 'island'])
@@ -280,16 +388,33 @@ class PlayTileAction(Action):
                 # Check if this tile is unplayable (should probably be a helper function)
                 safe_neighbors = [n for n in neighboring_chains if state['chains'][n] >= 11]
                 if len(safe_neighbors) >= 2:
-                    logger.error("Cannot play {} because 2+ neighboring chains are safe".format(self.tile))
-                    return {
-                        "status": 403
-                    }
+                    # just draw a new tile
+                    state['history'].append(['discard_unplayable_tile', self.tile])
+                    history_added = True
+                    self.player['tiles'].append(draw_tile(self.state))
+                    # logger.error("Cannot play {} because 2+ neighboring chains are safe".format(self.tile))
+                    # raise ActionForbiddenException()
+                else:
+                    state['history'].append([
+                        'play_tile',
+                        player['username'],
+                        self.tile,
+                        'merger'
+                    ])
+                    history_added = True
 
-                # Set current cell to island while merger is going on
-                state['hotels'][state['active_cell']] = 'island'
+                    # Set current cell to island while merger is going on
+                    state['hotels'][state['active_cell']] = 'island'
+                    # Change state to merger
+                    self.start_merger_helper(state, neighboring_chains)
 
-                # Change state to merger
-                start_merger_helper(state, neighboring_chains)
+        if not history_added:
+            state['history'].append([
+                'play_tile',
+                player['username'],
+                self.tile,
+                self.state['hotels'][self.tile]
+            ])
 
         GameState.objects.create(game=self.game, state=json.dumps(state))
         return state
@@ -324,6 +449,12 @@ class DeclareChainAction(Action):
 
         #     Subtract one stock from supply
         self.state['supply']['stocks'][self.chain] -= 1
+
+        self.state['history'].append([
+            'declare_chain',
+            self.player['username'],
+            self.chain
+        ])
 
         # Set state to "buy_stocks" and notify all.
         # self.state['state']['state'] = 'buy_stocks'
@@ -364,6 +495,12 @@ class BuyStocksAction(Action):
                 logger.error("{} doesn't have enough money to buy {}".format(self.user, self.stocks))
                 raise ActionForbiddenException()
 
+        self.state['history'].append([
+            'buy_stocks',
+            self.player['username'],
+            self.stocks
+        ])
+
         # # Draw Tile
         # Call draw_tile
         # Add drawn tile to players hand
@@ -373,7 +510,8 @@ class BuyStocksAction(Action):
         # If end_game flag is True
         # Call end_game()  # who knows what goes here?
         if self.state['end_game']:
-            print("Someone wants to end game here but it's not implemented")
+            self.end_game()
+            return self.state
 
         # Else
         # Set state to "play_tile,next_player()"  # where do we change state.current_player? maybe only need it globally for merging so merging_player?
@@ -428,30 +566,15 @@ class DisposeStockAction(Action):
         self.state['supply']['stocks'][defunct_chain] += self.cart['trade']
 
         #     Anything left is kept by player
+        self.state['history'].append([
+            'dispose_stock',
+            self.player['username'],
+            defunct_chain,
+            self.cart,
+            self.player['stocks'][defunct_chain]
+        ])
 
-        # find the next player with shares of defunct_chain or stop at merging_player
-        n_player = next_player(self.state)
-        self.state['state']['player'] = n_player
-
-        while (pluck_player(self.state, n_player)['stocks'][defunct_chain] == 0 and
-                n_player != self.state['merging_player']):
-            n_player = next_player(self.state)
-            self.state['state']['player'] = n_player
-
-        if n_player == self.state['merging_player']:
-            # if everyone has had a chance to dispose stock
-            self.state['merging_chains'] = self.state['merging_chains'][:-1]
-            if len(self.state['merging_chains']) > 1:
-                # If there is another merger to resolve
-                pay_bonuses(self.state)
-                self.state['state']['state'] = 'dispose_stock'
-            else:
-                # all merging is done
-                resolve_merge(self.state)
-                self.advance_to_buy_or_next()
-        else:
-            #     Set state to "dispose_stock,next_player_who_has_stock()"
-            self.state['state']['state'] = 'dispose_stock'
+        self.advance_to_next_dispose_stock()
 
         GameState.objects.create(game=self.game, state=json.dumps(self.state))
         return self.state
@@ -474,9 +597,37 @@ class DetermineWinnerAction(Action):
                 logger.error("{} can not be defunct, it is safe".format(chain))
                 raise ActionForbiddenException()
 
+        self.state['history'].append([
+            'determine_winner',
+            self.player['username'],
+            self.chains
+        ])
+
         # Call prepare_merger(requested_order)
         self.state['merging_chains'] = self.chains
-        prepare_merger(self.state)
+        self.prepare_merger(self.state)
+
+        GameState.objects.create(game=self.game, state=json.dumps(self.state))
+        return self.state
+
+
+class EndGameAction(Action):
+    def __init__(self, game_pk, user):
+        super(EndGameAction, self).__init__(game_pk, user)
+
+    def process(self):
+        # check that either all chains are safe or one chain has >= 41 hotels
+        all_safe = all([self.state['chains'][c] >= 11 or self.state['chains'][c] == 0 for c in self.state['chains']])
+        over_41 = any([self.state['chains'][c] >= 41 for c in self.state['chains']])
+
+        print(all_safe)
+        print(over_41)
+
+        if not all_safe and not over_41:
+            logger.error("{} calls for end of game but conditions not met".format(self.player['username']))
+            raise ActionForbiddenException()
+
+        self.state['end_game'] = True
 
         GameState.objects.create(game=self.game, state=json.dumps(self.state))
         return self.state
@@ -656,52 +807,6 @@ def draw_tile(state):
     return state['supply']['tiles'].pop()
 
 
-def start_merger_helper(state, merging_chains):
-    """Check if winner chain can be auto-declared for a new merger.
-
-    Called from play_tile if a merger has happened. Uses "active_cell" on state.
-
-    Assuming that merger is valid and there are not two safe chains involved.
-
-    Determine merging chains
-        Find chains of orthogonally adjacent cells
-
-    Add "merging_chains" to state from highest to lowest size
-    First in list will be winner and last will be smallest/first loser
-
-    If any two chains have the same size
-        Set state to "determine_winner_chain"
-        Client can prompt using "merging_chains" on state
-    Else:
-        Call prepare_merger
-    """
-    neighbors = set([c for c in get_neighboring_assignments(state, state['active_cell']) if c is not None and c != "island"])
-    state['merging_chains'] = sorted(list(neighbors), key=lambda x: state['chains'][x], reverse=True)
-
-    chain_sizes = [state['chains'][c] for c in state['merging_chains']]
-    if len(set(chain_sizes)) != len(chain_sizes):
-        # One or more chains have the same size
-        state['state']['state'] = 'determine_winner'
-    else:
-        prepare_merger(state)
-
-
-def prepare_merger(state):
-    """Modify state to start mergering.
-
-    Set merging_chains on state to match requested order
-    Set defunct_chains to merging_chains[1:]
-
-    Call pay_bonuses (should pay for first merger)
-    Set state to "dispose_loser,current_player"
-    """
-    state['defunct_chains'] = state['merging_chains'][1:]
-    state['merging_player'] = state['state']['player']
-
-    pay_bonuses(state)
-    state['state']['state'] = 'dispose_stock'
-
-
 def pluck_player(state, username):
     return [p for p in state['players'] if p['username'] == username][0]
 
@@ -769,26 +874,38 @@ def pay_bonuses(state):
 
     stock_holders.sort(key=lambda x: x['stocks'][defunct_chain], reverse=True)
 
-    equal_to_first = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[0]['stocks'][defunct_chain]]
-    if len(equal_to_first) != 1:
-        # split bonus
-        bonus = (majority_bonus + minority_bonus) / len(equal_to_first)
-        # round to nearest $100
-        bonus = int(math.ceil(bonus / 100.0)) * 100
-        for p in equal_to_first:
-            p['cash'] += bonus
+    if len(stock_holders) == 1:
+        # if there is only one stock holder, they get both bonuses
+        bonus = majority_bonus + minority_bonus
+        stock_holders[0]['cash'] += bonus
+        state['history'].append(['both_bonus', bonus, stock_holders[0]['username']])
     else:
-        stock_holders[0]['cash'] += majority_bonus
-
-        equal_to_second = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[1]['stocks'][defunct_chain]]
-        if len(equal_to_second) != 1:
-            bonus = minority_bonus / len(equal_to_second)
+        equal_to_first = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[0]['stocks'][defunct_chain]]
+        if len(equal_to_first) != 1:
+            # split bonus
+            bonus = (majority_bonus + minority_bonus) / len(equal_to_first)
             # round to nearest $100
             bonus = int(math.ceil(bonus / 100.0)) * 100
-            for p in equal_to_second:
+            for p in equal_to_first:
                 p['cash'] += bonus
+
+            state['history'].append(['majority_bonus', bonus] + equal_to_first)
         else:
-            stock_holders[1]['cash'] += minority_bonus
+            stock_holders[0]['cash'] += majority_bonus
+            state['history'].append(['majority_bonus', majority_bonus, stock_holders[0]['username']])
+
+            equal_to_second = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[1]['stocks'][defunct_chain]]
+            if len(equal_to_second) != 1:
+                bonus = minority_bonus / len(equal_to_second)
+                # round to nearest $100
+                bonus = int(math.ceil(bonus / 100.0)) * 100
+                for p in equal_to_second:
+                    p['cash'] += bonus
+
+                state['history'].append(['minority_bonus', bonus] + equal_to_second)
+            else:
+                stock_holders[1]['cash'] += minority_bonus
+                state['history'].append(['minority_bonus', minority_bonus, stock_holders[1]['username']])
 
 
 def dispose_loser_stock(request):
