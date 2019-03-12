@@ -239,6 +239,7 @@ class Action(abc.ABC):
             else:
                 # all merging is done
                 resolve_merge(self.state)
+                self.player = pluck_player(self.state, self.state['merging_player'])
                 self.advance_to_buy_or_next()
         else:
             # another player needs to dispose stock of loser
@@ -296,7 +297,9 @@ class Action(abc.ABC):
 
         for chain in active_chains:
             for player in self.state['players']:
-                player['cash'] += player['stocks'][chain] * get_stock_cost(self.state, chain)
+                income = player['stocks'][chain] * get_stock_cost(self.state, chain)
+                player['cash'] += income
+                self.state['history'].append(['sell_stocks', player['username'], player['stocks'][chain], chain, income])
 
         self.state['state']['state'] = 'end_game'
         self.state['state']['player'] = ''
@@ -620,9 +623,6 @@ class EndGameAction(Action):
         all_safe = all([self.state['chains'][c] >= 11 or self.state['chains'][c] == 0 for c in self.state['chains']])
         over_41 = any([self.state['chains'][c] >= 41 for c in self.state['chains']])
 
-        print(all_safe)
-        print(over_41)
-
         if not all_safe and not over_41:
             logger.error("{} calls for end of game but conditions not met".format(self.player['username']))
             raise ActionForbiddenException()
@@ -878,7 +878,7 @@ def pay_bonuses(state):
         # if there is only one stock holder, they get both bonuses
         bonus = majority_bonus + minority_bonus
         stock_holders[0]['cash'] += bonus
-        state['history'].append(['both_bonus', bonus, stock_holders[0]['username']])
+        state['history'].append(['both_bonus', bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
     else:
         equal_to_first = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[0]['stocks'][defunct_chain]]
         if len(equal_to_first) != 1:
@@ -889,10 +889,10 @@ def pay_bonuses(state):
             for p in equal_to_first:
                 p['cash'] += bonus
 
-            state['history'].append(['majority_bonus', bonus] + equal_to_first)
+            state['history'].append(['majority_bonus', bonus] + equal_to_first + [stock_holders[0]['stocks'][defunct_chain]])
         else:
             stock_holders[0]['cash'] += majority_bonus
-            state['history'].append(['majority_bonus', majority_bonus, stock_holders[0]['username']])
+            state['history'].append(['majority_bonus', majority_bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
 
             equal_to_second = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[1]['stocks'][defunct_chain]]
             if len(equal_to_second) != 1:
@@ -902,10 +902,10 @@ def pay_bonuses(state):
                 for p in equal_to_second:
                     p['cash'] += bonus
 
-                state['history'].append(['minority_bonus', bonus] + equal_to_second)
+                state['history'].append(['minority_bonus', bonus] + equal_to_second + [stock_holders[1]['stocks'][defunct_chain]])
             else:
                 stock_holders[1]['cash'] += minority_bonus
-                state['history'].append(['minority_bonus', minority_bonus, stock_holders[1]['username']])
+                state['history'].append(['minority_bonus', minority_bonus, stock_holders[1]['username'], stock_holders[1]['stocks'][defunct_chain]])
 
 
 def dispose_loser_stock(request):

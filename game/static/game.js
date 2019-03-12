@@ -1,6 +1,6 @@
 var fsm;
 
-var chatSocket = new WebSocket(
+var chatSocket = new ReconnectingWebSocket(
     'ws://' + window.location.host +
     '/ws/chat/' + roomName + '/');
 
@@ -277,7 +277,7 @@ var fsm = new machina.Fsm({
                     return b.cash - a.cash;
                 })
                 fsm.acquire.players.forEach(function (player) {
-                    instruction += " " + player.username + " : $" + player.cash;
+                    instruction += " " + player.username + ": $" + player.cash;
                 });
                 app.instruction = instruction;
             }
@@ -347,16 +347,16 @@ var fsm = new machina.Fsm({
             app.instruction = "Waiting for " + acquire.state.player + " to " + acquire.state.state;
         }
 
-        fsm.checkForEnd();
+        fsm.checkForEnd(acquire.chains);
     },
 
-    checkForEnd: function () {
-        var allSafe = Object.keys(fsm.acquire.chains).reduce(function (prev, chainName) {
-            return prev && (fsm.acquire.chains[chainName] >= 11 || fsm.acquire.chains[chainName == 0]);
-        });
-        var over41 = Object.keys(fsm.acquire.chains).reduce(function (prev, chainName) {
-            return prev || fsm.acquire.chains[chainName] >= 41;
-        });
+    checkForEnd: function (chains) {
+        var allSafe = Object.keys(chains).reduce(function (prev, chainName) {
+            return prev && (chains[chainName] >= 11 || chains[chainName] == 0);
+        }, true);
+        var over41 = Object.keys(chains).reduce(function (prev, chainName) {
+            return prev || chains[chainName] >= 41;
+        }, false);
         if (allSafe || over41) {
             app.showEndGame = true;
         }

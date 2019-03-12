@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 
@@ -14,7 +15,22 @@ class GameConsumer(JsonWebsocketConsumer):
     def connect(self):
         self.game_pk = self.scope['url_route']['kwargs']['game_pk']
         self.user = self.scope['user']
+        self.room_group_name = '{}-{}'.format(self.game_pk, self.user.username)
+
+        print("group adding {} {}".format(self.room_group_name, self.channel_name))
+        async_to_sync(self.channel_layer.group_add)(
+            self.room_group_name,
+            self.channel_name
+        )
+
         self.accept()
+
+    def disconnect(self, close_code):
+        # Leave room group
+        async_to_sync(self.channel_layer.group_discard)(
+            self.room_group_name,
+            self.channel_name
+        )
 
     def receive_json(self, content):
         print(content)
@@ -47,12 +63,32 @@ class GameConsumer(JsonWebsocketConsumer):
         except ActionForbiddenException:
             new_state = {"status": 403}
 
-        print(new_state)
-        self.send_json(new_state)
+        players = copy.deepcopy(new_state['players'])
+        for player in players:
+            new_state['players'] = copy.deepcopy(players)
+            for i, p in enumerate(new_state['players']):
+                if player['username'] != p['username']:
+                    del p['tiles']
 
-    def disconnect(self, close_code):
-        print("Socket to {} closed".format(self.user))
-        pass
+            player_room_name = "{}-{}".format(self.game_pk, player['username'])
+
+            print("Trying to group_send to {}".format(player_room_name))
+            async_to_sync(self.channel_layer.group_send)(
+                player_room_name,
+                {
+                    'type': 'state_message',
+                    'state': new_state
+                }
+            )
+
+
+    # Receive message from room group
+    def state_message(self, event):
+        print("In state_message for {}".format(self.room_group_name))
+        message = event['state']
+
+        # Send message to WebSocket
+        self.send_json(message)
 
 
 # class ChatConsumer(WebsocketConsumer):
