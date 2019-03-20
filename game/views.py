@@ -6,8 +6,8 @@ import random
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
-from django.http import HttpResponseBadRequest
+# from django.core.exceptions import PermissionDenied
+# from django.http import HttpResponseBadRequest
 from django.shortcuts import render, get_object_or_404
 from django.utils.safestring import mark_safe
 
@@ -180,6 +180,8 @@ class ActionForbiddenException(Exception):
 
 class Action(abc.ABC):
     def __init__(self, game_pk, user):
+        super(Action, self).__init__()
+
         self.game_pk = game_pk
         self.user = user
 
@@ -195,6 +197,15 @@ class Action(abc.ABC):
         if self.state['state']['state'] == 'end_game':
             logger.error('{} sent a play but game is over'.format(user.username))
             raise ActionForbiddenException()
+
+    @abc.abstractmethod
+    def process(self):
+        pass
+
+
+class TurnAction(Action):
+    def __init__(self, game_pk, user):
+        super(TurnAction, self).__init__(game_pk, user)
 
         if self.state['state']['player'] != user.username:
             print('{} sent a play but it is not their turn'.format(user.username))
@@ -306,12 +317,8 @@ class Action(abc.ABC):
 
         GameState.objects.create(game=self.game, state=json.dumps(self.state))
 
-    @abc.abstractmethod
-    def process(self):
-        pass
 
-
-class PlayTileAction(Action):
+class PlayTileAction(TurnAction):
     def __init__(self, game_pk, user, tile):
         super(PlayTileAction, self).__init__(game_pk, user)
         self.tile = tile
@@ -423,7 +430,7 @@ class PlayTileAction(Action):
         return state
 
 
-class DeclareChainAction(Action):
+class DeclareChainAction(TurnAction):
     def __init__(self, game_pk, user, chain):
         super(DeclareChainAction, self).__init__(game_pk, user)
         self.chain = chain
@@ -467,7 +474,7 @@ class DeclareChainAction(Action):
         return self.state
 
 
-class BuyStocksAction(Action):
+class BuyStocksAction(TurnAction):
     def __init__(self, game_pk, user, stocks):
         super(BuyStocksAction, self).__init__(game_pk, user)
         self.stocks = stocks
@@ -528,7 +535,7 @@ class BuyStocksAction(Action):
         return self.state
 
 
-class DisposeStockAction(Action):
+class DisposeStockAction(TurnAction):
     def __init__(self, game_pk, user, cart):
         super(DisposeStockAction, self).__init__(game_pk, user)
         self.cart = cart
@@ -583,7 +590,7 @@ class DisposeStockAction(Action):
         return self.state
 
 
-class DetermineWinnerAction(Action):
+class DetermineWinnerAction(TurnAction):
     def __init__(self, game_pk, user, chains):
         super(DetermineWinnerAction, self).__init__(game_pk, user)
         self.chains = chains
@@ -614,7 +621,15 @@ class DetermineWinnerAction(Action):
         return self.state
 
 
-class EndGameAction(Action):
+class GetStateAction(Action):
+    def __init__(self, game_pk, user):
+        super(GetStateAction, self).__init__(game_pk, user)
+
+    def process(self):
+        return self.state
+
+
+class EndGameAction(TurnAction):
     def __init__(self, game_pk, user):
         super(EndGameAction, self).__init__(game_pk, user)
 
@@ -889,7 +904,7 @@ def pay_bonuses(state):
             for p in equal_to_first:
                 p['cash'] += bonus
 
-            state['history'].append(['majority_bonus', bonus] + equal_to_first + [stock_holders[0]['stocks'][defunct_chain]])
+            state['history'].append(['majority_bonus', bonus] + [p['username'] for p in equal_to_first] + [stock_holders[0]['stocks'][defunct_chain]])
         else:
             stock_holders[0]['cash'] += majority_bonus
             state['history'].append(['majority_bonus', majority_bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
@@ -902,7 +917,7 @@ def pay_bonuses(state):
                 for p in equal_to_second:
                     p['cash'] += bonus
 
-                state['history'].append(['minority_bonus', bonus] + equal_to_second + [stock_holders[1]['stocks'][defunct_chain]])
+                state['history'].append(['minority_bonus', bonus] + [p['username'] for p in equal_to_second] + [stock_holders[1]['stocks'][defunct_chain]])
             else:
                 stock_holders[1]['cash'] += minority_bonus
                 state['history'].append(['minority_bonus', minority_bonus, stock_holders[1]['username'], stock_holders[1]['stocks'][defunct_chain]])

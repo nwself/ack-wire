@@ -1,11 +1,10 @@
 import copy
-import json
 import logging
 
 from asgiref.sync import async_to_sync
 from channels.generic.websocket import JsonWebsocketConsumer
 
-from .views import PlayTileAction, DeclareChainAction, BuyStocksAction, DisposeStockAction, DetermineWinnerAction, EndGameAction, ActionForbiddenException
+from .views import PlayTileAction, DeclareChainAction, BuyStocksAction, DisposeStockAction, DetermineWinnerAction, EndGameAction, GetStateAction, ActionForbiddenException
 
 
 logger = logging.getLogger(__file__)
@@ -35,6 +34,11 @@ class GameConsumer(JsonWebsocketConsumer):
     def receive_json(self, content):
         print(content)
 
+        if 'action' not in content:
+            state = {"status": 403}
+            self.send_json(state)
+            return
+
         try:
             action = None
             if content['action'] == 'play_tile':
@@ -56,17 +60,28 @@ class GameConsumer(JsonWebsocketConsumer):
             elif content['action'] == 'end_game':
                 print("{} {} end_game".format(self.game_pk, self.user))
                 action = EndGameAction(self.game_pk, self.user)
+            elif content['action'] == 'get_state':
+                action = GetStateAction(self.game_pk, self.user)
             else:
-                logger.error("In receive got unknown action {} body {}".format(content['action'], content['body']))
+                logger.error("In receive got unknown action {}".format(content))
+                state = {"status": 403}
 
-            new_state = action.process() if action else {}
+            state = action.process() if action else {"status": 403}
         except ActionForbiddenException:
-            new_state = {"status": 403}
+            state = {"status": 403}
 
-        players = copy.deepcopy(new_state['players'])
+        if "status" in state and state['status'] == 403:
+            self.send_json(state)
+            return
+        elif content['action'] == 'get_state':
+            self.send_json(state)
+            return
+
+        # print(state)
+        players = copy.deepcopy(state['players'])
         for player in players:
-            new_state['players'] = copy.deepcopy(players)
-            for i, p in enumerate(new_state['players']):
+            state['players'] = copy.deepcopy(players)
+            for i, p in enumerate(state['players']):
                 if player['username'] != p['username']:
                     del p['tiles']
 
@@ -77,10 +92,9 @@ class GameConsumer(JsonWebsocketConsumer):
                 player_room_name,
                 {
                     'type': 'state_message',
-                    'state': new_state
+                    'state': state
                 }
             )
-
 
     # Receive message from room group
     def state_message(self, event):

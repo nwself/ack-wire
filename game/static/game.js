@@ -4,7 +4,7 @@ var chatSocket = new ReconnectingWebSocket(
     'ws://' + window.location.host +
     '/ws/chat/' + roomName + '/');
 
-chatSocket.onmessage = function(e) {
+chatSocket.addEventListener('message', function(e) {
     var data = JSON.parse(e.data);
     console.log(data);
 
@@ -13,14 +13,27 @@ chatSocket.onmessage = function(e) {
     } else {
         fsm.handleNewState(data);
     }
+});
 
-    // var message = data['message'];
-    // document.querySelector('#chat-log').value += (message + '\n');
-};
+var firstOpenListener = function (e) {
+    chatSocket.removeEventListener('open', firstOpenListener);
+    chatSocket.addEventListener('open', function (e) {
+        console.log("socket has reconnected, need to ask for current state");
+        if (fsm.acquire.state.state != 'end_game') {
+            chatSocket.send(JSON.stringify({
+                action: 'get_state'
+            }));
+        } else {
+            chatSocket.close();
+        }
+    });
+}
 
-chatSocket.onclose = function(e) {
+chatSocket.addEventListener('open', firstOpenListener);
+
+chatSocket.addEventListener('close', function(e) {
     console.error('Chat socket closed unexpectedly');
-};
+});
 
 function array_move(arr, old_index, new_index) {
     if (new_index >= arr.length) {
@@ -330,7 +343,7 @@ var fsm = new machina.Fsm({
             };
         });
 
-        app.supplyStocks = Object.keys(app.player.stocks).map(function (stockName) {
+        app.supplyStocks = Object.keys(acquire.supply.stocks).map(function (stockName) {
             return {
                 name: stockName,
                 count: acquire.supply.stocks[stockName],
