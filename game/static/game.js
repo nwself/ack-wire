@@ -325,7 +325,7 @@ var fsm = new machina.Fsm({
 
         if (app.player.length !== 0) {
             app.player = app.player[0];
-            app.hand = app.player.tiles.sort().map(function (coordinates) {
+            app.hand = app.player.tiles.map(function (coordinates) {
                 return new Tile({
                     coordinates: coordinates
                 });
@@ -351,7 +351,7 @@ var fsm = new machina.Fsm({
             };
         });
 
-        app.history = acquire.history;
+        app.history = acquire.history.reverse();
 
         if (acquire.state.player == username || acquire.state.player == '') {
             this.transition(acquire.state.state);
@@ -419,6 +419,12 @@ function Tile(obj) {
 Tile.prototype.play = function (event, model) {
     console.log("Would like to play", model.tile.coordinates);
     fsm.tileClicked(model.tile);
+}
+Tile.prototype.mouseenter = function (event, model) {
+    console.log("Hover enter");
+}
+Tile.prototype.mouseout = function (event, model) {
+    console.log("Hover out");
 }
 
 

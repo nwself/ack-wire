@@ -50,7 +50,7 @@
       <tbody>
       <tr>
         <th>Hand</th>
-        <td rv-each-tile="app.hand" rv-on-click="tile.play">{ tile.coordinates }</td>
+        <td rv-each-tile="app.hand" rv-on-click="tile.play" rv-on-mouseenter="tile.mouseenter" rv-on-mouseout="tile.mouseout">{ tile.coordinates }</td>
       </tr>
       </tbody>
     </table>
