@@ -5,3 +5,5 @@ Can only start game in shell with
 from game.views import start_game
 start_game('slug-name', ['username1', 'username2'])
 ```
+
+Redis needs to be running.

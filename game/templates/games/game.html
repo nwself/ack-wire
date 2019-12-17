@@ -17,151 +17,154 @@
 </head>
 <body>
 <main id="main">
-  <div style="float: right">
+  <div>
+    <div>
+      { app.player.username }
+    </div>
+    <div id="board">
+      <table>
+        <tbody>
+          <tr rv-each-row="app.board">
+            <td rv-each-cell="row" rv-class="cell.chain">{ cell.coordinates }</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div rv-show="app.gameEnded">
+      <strong>GAME ENDED</strong>
+    </div>
+    <div>
+      <p>
+        { app.instruction }
+      </p>
+    </div>
+
+    <div id="hand">
+      <table>
+        <tbody>
+        <tr>
+          <th>Hand</th>
+          <td rv-each-tile="app.hand" rv-on-click="tile.play">{ tile.coordinates }</td>
+        </tr>
+        </tbody>
+      </table>
+      <table>
+        <tbody>
+        <tr>
+          <th>Stocks</th>
+          <td rv-each-stock="app.playerStocks">{ stock.count } { stock.name }</td>
+        </tr>
+        </tbody>
+      </table>
+      <p>Cash: ${ app.player.cash }</p>
+      <div rv-show="app.showEndGame">
+        <button rv-on-click="app.endGame">End Game</button>
+      </div>
+    </div>
+
+    <div id="shop">
+      <div id="determine-winner" rv-show="app.showDetermineWinner">
+        Choose order of merge.
+
+        <table>
+          <tbody>
+            <tr rv-each-chain="app.mergingChains">
+              <td>{ chain.order }</td>
+              <td>{ chain.name }</td>
+              <td>{ chain.size }</td>
+              <td><button rv-on-click="chain.up" rv-enabled="chain.canUp < order | call chain">up</button></td>
+              <td><button rv-on-click="chain.down" rv-enabled="chain.canDown < order | call chain">down</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <button rv-on-click="app.determineWinner">Validate</button>
+      </div>
+      <div id="dispose-stock" rv-show="app.showDisposeStocks">
+        { app.stockDisposer.winnerChain } wins the merger. { app.stockDisposer.defunctChain } is defunct.
+        <table>
+          <tbody>
+            <tr>
+              <th>Trade</th>
+              <td>{ app.stockDisposer.disposeCart.trade }</td>
+              <td><button rv-on-click="app.stockDisposer.tradeIncrement" rv-enabled="app.stockDisposer.canTrade < disposeCart.sell disposeCart.trade | call">+</button></td>
+              <td><button rv-on-click="app.stockDisposer.tradeDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.trade">-</button></td>
+              <td>{ app.stockDisposer.tradeIncome < disposeCart.trade | call }</td>
+            </tr>
+            <tr>
+              <th>Sell</th>
+              <td>{ app.stockDisposer.disposeCart.sell }</td>
+              <td><button rv-on-click="app.stockDisposer.sellIncrement" rv-enabled="app.stockDisposer.canSell < disposeCart.sell disposeCart.trade | call">+</button></td>
+              <td><button rv-on-click="app.stockDisposer.sellDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.sell">-</button></td>
+              <td>${ app.stockDisposer.sellIncome < disposeCart.sell | call }</td>
+            </tr>
+            <tr>
+              <th>Keep</th>
+              <td>{ app.stockDisposer.keepCount < disposeCart.sell disposeCart.trade | call }</td>
+            </tr>
+          </tbody>
+        </table>
+        <button rv-on-click="app.stockDisposer.validate">Validate</button>
+      </div>
+      <div id="shop-chains" rv-show="app.showAvailableChains">
+        <ul>
+          <li rv-each-chain="app.availableChains" rv-on-click="chain.declare">{ chain.name }</li>
+        </ul>
+      </div>
+      <div id="shop-stocks" rv-show="app.showAvailableStocks">
+        <table>
+          <tbody>
+            <tr rv-each-stock="app.availableStocks">
+              <td>{ app.cartCount < stocksCart | call stock }</td>
+              <td>{ stock.name }</td>
+              <td>${ app.lookupChainCost | call stock.name }</td>
+              <td>{ stock.size }</td>
+              <td><button rv-on-click="stock.increment" rv-enabled="app.canAddStock < stocksCart | call stock">+</button></td>
+              <td><button rv-on-click="stock.decrement" rv-disabled="app.hasNone < stocksCart | call stock">-</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div>
+          <p>
+            Total cost: ${ app.totalCost < stocksCart | call }
+          </p>
+          <button rv-on-click="app.buyStocks">Validate</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="supply">
+      <div id="supply-chains">
+        <p>Supply Stocks</p>
+        <table>
+          <thead>
+            <tr>
+              <td></td>
+              <td>Shares</td>
+              <td>Size</td>
+              <td>Cost</td>
+            </tr>
+          </thead>
+          <tbody>
+          <tr rv-each-stock="app.supplyStocks">
+            <td>{ stock.name }</td>
+            <td>{ stock.count }</td>
+            <td>{ stock.chainSize }</td>
+            <td>${ app.lookupChainCost | call stock.name }</td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div id="history">
     <ul>
         <li rv-each-event="app.history">
           { event | historyFormatter }
         </li>
     </ul>
   </div>
-  <div>
-    { app.player.username }
-  </div>
-  <div id="board">
-    <table>
-      <tbody>
-        <tr rv-each-row="app.board">
-          <td rv-each-cell="row" rv-class="cell.chain">{ cell.coordinates }</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
 
-  <div rv-show="app.gameEnded">
-    <strong>GAME ENDED</strong>
-  </div>
-  <div>
-    <p>
-      { app.instruction }
-    </p>
-  </div>
-
-  <div id="hand">
-    <table>
-      <tbody>
-      <tr>
-        <th>Hand</th>
-        <td rv-each-tile="app.hand" rv-on-click="tile.play">{ tile.coordinates }</td>
-      </tr>
-      </tbody>
-    </table>
-    <table>
-      <tbody>
-      <tr>
-        <th>Stocks</th>
-        <td rv-each-stock="app.playerStocks">{ stock.count } { stock.name }</td>
-      </tr>
-      </tbody>
-    </table>
-    <p>Cash: ${ app.player.cash }</p>
-    <div rv-show="app.showEndGame">
-      <button rv-on-click="app.endGame">End Game</button>
-    </div>
-  </div>
-
-  <div id="shop">
-    <div id="determine-winner" rv-show="app.showDetermineWinner">
-      Choose order of merge.
-
-      <table>
-        <tbody>
-          <tr rv-each-chain="app.mergingChains">
-            <td>{ chain.order }</td>
-            <td>{ chain.name }</td>
-            <td>{ chain.size }</td>
-            <td><button rv-on-click="chain.up" rv-enabled="chain.canUp < order | call chain">up</button></td>
-            <td><button rv-on-click="chain.down" rv-enabled="chain.canDown < order | call chain">down</button></td>
-          </tr>
-        </tbody>
-      </table>
-      <button rv-on-click="app.determineWinner">Validate</button>
-    </div>
-    <div id="dispose-stock" rv-show="app.showDisposeStocks">
-      { app.stockDisposer.winnerChain } wins the merger. { app.stockDisposer.defunctChain } is defunct.
-      <table>
-        <tbody>
-          <tr>
-            <th>Trade</th>
-            <td>{ app.stockDisposer.disposeCart.trade }</td>
-            <td><button rv-on-click="app.stockDisposer.tradeIncrement" rv-enabled="app.stockDisposer.canTrade < disposeCart.sell disposeCart.trade | call">+</button>
-            <td><button rv-on-click="app.stockDisposer.tradeDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.trade">-</button>
-            <td>{ app.stockDisposer.tradeIncome < disposeCart.trade | call }</td>
-          </tr>
-          <tr>
-            <th>Sell</th>
-            <td>{ app.stockDisposer.disposeCart.sell }</td>
-            <td><button rv-on-click="app.stockDisposer.sellIncrement" rv-enabled="app.stockDisposer.canSell < disposeCart.sell disposeCart.trade | call">+</button>
-            <td><button rv-on-click="app.stockDisposer.sellDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.sell">-</button>
-            <td>${ app.stockDisposer.sellIncome < disposeCart.sell | call }</td>
-          </tr>
-          <tr>
-            <th>Keep</th>
-            <td>{ app.stockDisposer.keepCount < disposeCart.sell disposeCart.trade | call }</td>
-          </tr>
-        </tbody>
-      </table>
-      <button rv-on-click="app.stockDisposer.validate">Validate</button>
-    </div>
-    <div id="shop-chains" rv-show="app.showAvailableChains">
-      <ul>
-        <li rv-each-chain="app.availableChains" rv-on-click="chain.declare">{ chain.name }</li>
-      </ul>
-    </div>
-    <div id="shop-stocks" rv-show="app.showAvailableStocks">
-      <table>
-        <tbody>
-          <tr rv-each-stock="app.availableStocks">
-            <td>{ app.cartCount < stocksCart | call stock }</td>
-            <td>{ stock.name }</td>
-            <td>${ app.lookupChainCost | call stock.name }</td>
-            <td>{ stock.size }</td>
-            <td><button rv-on-click="stock.increment" rv-enabled="app.canAddStock < stocksCart | call stock">+</button>
-            <td><button rv-on-click="stock.decrement" rv-disabled="app.hasNone < stocksCart | call stock">-</button>
-          </div>
-        </tbody>
-      </table>
-      <div>
-        <p>
-          Total cost: ${ app.totalCost < stocksCart | call }
-        </p>
-        <button rv-on-click="app.buyStocks">Validate</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="supply">
-    <div id="supply-chains">
-      <p>Supply Stocks</p>
-      <table>
-        <thead>
-          <tr>
-            <td></td>
-            <td>Shares</td>
-            <td>Size</td>
-            <td>Cost</td>
-          </tr>
-        </thead>
-        <tbody>
-        <tr rv-each-stock="app.supplyStocks">
-          <td>{ stock.name }</td>
-          <td>{ stock.count }</td>
-          <td>{ stock.chainSize }</td>
-          <td>${ app.lookupChainCost | call stock.name }</td>
-        </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
 
   <script type="text/javascript">
   var roomName = {{ game_name_json }};
