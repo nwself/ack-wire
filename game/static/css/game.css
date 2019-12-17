@@ -3,6 +3,10 @@ td.island {
   color: white;
 }
 
+td.in-hand {
+  border: solid 1px black;
+}
+
 td.Tower {
   background-color: yellow;
 }

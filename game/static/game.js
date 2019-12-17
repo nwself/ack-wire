@@ -306,19 +306,6 @@ var fsm = new machina.Fsm({
         app.board = [];
         app.hand = [];
 
-        var letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
-        for (var i = 0; i < letters.length; i++) {
-            var row = [];
-            for (var j = 0; j < 12; j++) {
-                var coordinates = letters[i] + (j + 1);
-                row.push(new Cell({
-                    coordinates: coordinates,
-                    chain: ((coordinates in acquire.hotels) ? acquire.hotels[coordinates] : null),
-                }));
-            }
-            app.board.push(row);
-        }
-
         app.player = acquire.players.filter(function (player) {
             return player.username === username;
         });
@@ -326,12 +313,29 @@ var fsm = new machina.Fsm({
         if (app.player.length !== 0) {
             app.player = app.player[0];
             app.hand = app.player.tiles.map(function (coordinates) {
+                // side effect time
+                acquire.hotels[coordinates] = 'in-hand';
+
                 return new Tile({
                     coordinates: coordinates
                 });
             });
         } else {
             app.player = null;
+        }
+
+        var letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+        for (var i = 0; i < letters.length; i++) {
+            var row = [];
+            for (var j = 0; j < 12; j++) {
+                var coordinates = letters[i] + (j + 1);
+
+                row.push(new Cell({
+                    coordinates: coordinates,
+                    chain: ((coordinates in acquire.hotels) ? acquire.hotels[coordinates] : null),
+                }));
+            }
+            app.board.push(row);
         }
 
         app.playerStocks = Object.keys(app.player.stocks).filter(function (stockName) {
@@ -371,6 +375,7 @@ var fsm = new machina.Fsm({
             return prev || chains[chainName] >= 41;
         }, false);
         if (allSafe || over41) {
+            console.log("allSafe", allSafe, "over41", over41);
             app.showEndGame = true;
         }
         app.gameEnded = fsm.acquire.end_game;
@@ -420,13 +425,6 @@ Tile.prototype.play = function (event, model) {
     console.log("Would like to play", model.tile.coordinates);
     fsm.tileClicked(model.tile);
 }
-Tile.prototype.mouseenter = function (event, model) {
-    console.log("Hover enter");
-}
-Tile.prototype.mouseout = function (event, model) {
-    console.log("Hover out");
-}
-
 
 function Chain(obj) {
     this.name = obj.name;
