@@ -1,7 +1,7 @@
 var fsm;
 
 var chatSocket = new ReconnectingWebSocket(
-    'ws://' + window.location.host +
+    'wss://' + window.location.host +
     '/ws/chat/' + roomName + '/');
 
 chatSocket.addEventListener('message', function(e) {
