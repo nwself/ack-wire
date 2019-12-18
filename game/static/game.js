@@ -102,6 +102,7 @@ var app = {
         } else if (chainName === "Imperial" || chainName === "Continental") {
             return initial + 200;
         }
+        console.log("Cost for", chainName, initial);
         return initial;
     },
     cartCount: function (stock) {
@@ -370,6 +371,8 @@ var fsm = new machina.Fsm({
     checkForEnd: function (chains) {
         var allSafe = Object.keys(chains).reduce(function (prev, chainName) {
             return prev && (chains[chainName] >= 11 || chains[chainName] == 0);
+        }, true) && !Object.keys(chains).reduce(function (prev, chainName) {
+            return prev && chains[chainName] == 0;
         }, true);
         var over41 = Object.keys(chains).reduce(function (prev, chainName) {
             return prev || chains[chainName] >= 41;
