@@ -91,8 +91,8 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [os.environ.get("REDIS_URL")],
-            # "hosts": [('127.0.0.1', 6379)],
+            "hosts": [('127.0.0.1', 6379)],
+            # "hosts": [os.environ.get("REDIS_URL"), ('127.0.0.1', 6379)],
         },
     },
 }
@@ -187,7 +187,8 @@ LOGGING = {
 }
 
 # Configure Django App for Heroku.
-import django_heroku
-django_heroku.settings(locals())
+if os.environ.get("REDIS_URL"):
+    import django_heroku
+    django_heroku.settings(locals())
 
-DATABASES['default']['CONN_MAX_AGE'] = 0
+    DATABASES['default']['CONN_MAX_AGE'] = 0

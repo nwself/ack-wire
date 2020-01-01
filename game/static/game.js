@@ -1,8 +1,8 @@
 var fsm;
 
-var chatSocket = new ReconnectingWebSocket(
-    'wss://' + window.location.host +
-    '/ws/chat/' + roomName + '/');
+var websocketURL = ((location.protocol == 'https:') ? "wss" : "ws") + "://" + window.location.host + '/ws/chat/' + roomName + '/';
+
+var chatSocket = new ReconnectingWebSocket(websocketURL);
 
 chatSocket.addEventListener('message', function(e) {
     var data = JSON.parse(e.data);
@@ -349,11 +349,11 @@ var fsm = new machina.Fsm({
         });
 
         app.supplyStocks = Object.keys(acquire.supply.stocks).map(function (stockName) {
-            return {
+            return new Stock({
                 name: stockName,
                 count: acquire.supply.stocks[stockName],
-                chainSize: acquire.chains[stockName]
-            };
+                size: acquire.chains[stockName]
+            });
         });
 
         app.history = acquire.history.reverse();
@@ -443,7 +443,13 @@ Chain.prototype.declare = function (event, model) {
 function Stock(obj) {
     this.name = obj.name;
     this.available = obj.available;
+    this.count = obj.count;
     this.size = obj.size;
+}
+
+Stock.prototype.getCost = function (event, model) {
+    console.log("Getting chain cost from model", model);
+    return app.lookupChainCost(this.name);
 }
 
 Stock.prototype.decrement = function (event, model) {
