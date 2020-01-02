@@ -420,6 +420,12 @@ function Cell(obj) {
     this.chain = obj.chain;
 }
 
+Cell.prototype.play = function (event, model) {
+    if (event.target.classList.contains('in-hand')) {
+        fsm.tileClicked(model.cell);
+    }
+}
+
 
 function Tile(obj) {
     this.coordinates = obj.coordinates;

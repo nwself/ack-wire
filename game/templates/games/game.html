@@ -25,7 +25,7 @@
       <table>
         <tbody>
           <tr rv-each-row="app.board">
-            <td rv-each-cell="row" rv-class="cell.chain">{ cell.coordinates }</td>
+            <td rv-each-cell="row" rv-class="cell.chain" rv-on-click="cell.play">{ cell.coordinates }</td>
           </tr>
         </tbody>
       </table>
@@ -65,7 +65,7 @@
 
     <div id="shop">
       <div id="determine-winner" rv-show="app.showDetermineWinner">
-        Choose order of merge. Uppermost chain will be the winner and will acquire all chains below it.
+        Choose order of merge. Uppermost chain will be the winner and will acquire any chains below it.
 
         <table>
           <tbody>
