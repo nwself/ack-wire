@@ -175,7 +175,9 @@ def notify_all(state):
 
 
 class ActionForbiddenException(Exception):
-    pass
+    def __init__(self, text=''):
+        super(Exception, self).__init__()
+        self.text = text
 
 
 class Action(abc.ABC):
@@ -381,7 +383,7 @@ class PlayTileAction(TurnAction):
             else:
                 # TODO client need to prevent user from forming chains with no chains available
                 logger.error("{} plays {} to form chain but no available chains".format(player['username'], self.tile))
-                raise ActionForbiddenException()
+                raise ActionForbiddenException("No available chains")
         else:
             # There must at least be one chain adjacent
             neighboring_chains = set([n for n in neighbors if n is not None and n != 'island'])
@@ -483,7 +485,7 @@ class BuyStocksAction(TurnAction):
         #     Has this player asked for more than 3 stocks?
         if len(self.stocks) > 3:
             logger.error("{} buys more than 3 stocks {}".format(self.user, self.stocks))
-            raise ActionForbiddenException()
+            raise ActionForbiddenException("Buying more than 3 stocks")
         #     Are these stocks available in the supply?
 
         #     Does this player have enough money to buy these stocks?

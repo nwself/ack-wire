@@ -10,6 +10,7 @@ chatSocket.addEventListener('message', function(e) {
 
     if ("status" in data) {
         console.log("Possibly something has gone wrong");
+        app.instruction += " Error status: " + data.status + " " + data.text;
     } else {
         fsm.handleNewState(data);
     }

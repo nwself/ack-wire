@@ -67,8 +67,8 @@ class GameConsumer(JsonWebsocketConsumer):
                 state = {"status": 403}
 
             state = action.process() if action else {"status": 403}
-        except ActionForbiddenException:
-            state = {"status": 403}
+        except ActionForbiddenException as e:
+            state = {"status": 403, "text": e.text}
 
         if "status" in state and state['status'] == 403:
             self.send_json(state)
