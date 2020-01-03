@@ -13,30 +13,37 @@ td.in-hand {
   border: solid 1px black;
 }
 
+span.Tower,
 td.Tower {
   background-color: yellow;
 }
 
+span.Luxor,
 td.Luxor {
   background-color: orange;
 }
 
+span.American,
 td.American {
   background-color: blue;
   color: white;
 }
 
+span.Festival,
 td.Festival {
   background-color: green;
   color: white;
 }
+span.Worldwide,
 td.Worldwide {
   background-color: brown;
   color: white;
 }
+span.Continental,
 td.Continental {
   background-color: teal;
 }
+span.Imperial,
 td.Imperial {
   background-color: magenta;
 }
@@ -44,3 +51,4 @@ td.Imperial {
 #history {
   overflow-x: scroll;
 }
+

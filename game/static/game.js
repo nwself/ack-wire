@@ -359,7 +359,8 @@ var fsm = new machina.Fsm({
         }).map(function (stockName) {
             return {
                 name: stockName,
-                count: app.player.stocks[stockName]
+                count: app.player.stocks[stockName],
+                swatch: stockName + " swatch"
             };
         });
 
@@ -471,6 +472,7 @@ function Stock(obj) {
     this.available = obj.available;
     this.count = obj.count;
     this.size = obj.size;
+    this.swatch = this.name + " swatch";
 }
 
 Stock.prototype.getCost = function (event, model) {

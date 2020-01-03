@@ -53,7 +53,7 @@
         <tbody>
         <tr>
           <th>Stocks</th>
-          <td rv-each-stock="app.playerStocks">{ stock.count } { stock.name }</td>
+          <td rv-each-stock="app.playerStocks">{ stock.count } { stock.name } <span rv-class="stock.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td>
         </tr>
         </tbody>
       </table>
@@ -148,6 +148,7 @@
           </thead>
           <tbody>
           <tr rv-each-stock="app.supplyStocks">
+            <td rv-class="stock.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
             <td>{ stock.name }</td>
             <td>${ stock.getCost < size | call stock }</td>
             <td>{ stock.size }</td>
@@ -155,6 +156,7 @@
             <td>{ stock.count }</td>
           </tr>
           <tr>
+            <td></td>
             <td>Cash</td>
             <td></td>
             <td></td>
