@@ -52,7 +52,8 @@ var stockCosts = [200, 200, 200, 300, 400, 500, 600, 600, 600, 600, 600, 700, 70
 var app = {
     board: [],
     hand: [],
-    playerStocks: [],    
+    playerStocks: [],
+    players: [],
     instruction: '',
     stocksCart: [],
     showDisposeStocks: false,
@@ -110,6 +111,15 @@ var app = {
         return app.stocksCart.reduce(function (prev, s) {
             return prev + ((s.name == stock.name) ? 1 : 0);
         }, 0);
+    },
+    getShareCount: function (playerName, chain) {
+        var players = app.players.filter(function (player) {
+            return player.name == playerName;
+        });
+        if (players.length == 0) {
+            return 0;
+        }
+        return (chain in players[0].stocks) ? players[0].stocks[chain] : 0;
     },
     endGame: function () {
         fsm.endGame();
@@ -340,6 +350,10 @@ var fsm = new machina.Fsm({
             app.board.push(row);
         }
 
+        app.players = acquire.players.map(function (player) {
+            return new Player(player);
+        });
+
         app.playerStocks = Object.keys(app.player.stocks).filter(function (stockName) {
             return app.player.stocks[stockName] > 0;
         }).map(function (stockName) {
@@ -414,6 +428,11 @@ var fsm = new machina.Fsm({
     }
 });
 
+function Player(obj) {
+    this.name = obj.username;
+    this.stocks = obj.stocks;
+    this.cash = obj.cash;
+}
 
 function Cell(obj) {
     this.coordinates = obj.coordinates;
