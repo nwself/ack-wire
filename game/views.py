@@ -5,10 +5,12 @@ import logging
 import random
 
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 # from django.core.exceptions import PermissionDenied
 # from django.http import HttpResponseBadRequest
 from django.shortcuts import render, get_object_or_404
+from django.views.generic.edit import CreateView
 from django.utils.safestring import mark_safe
 
 
@@ -23,6 +25,11 @@ def lobby(request):
     return render(request, 'games/lobby.html', {
         'current_games': request.user.game_set.all()
     })
+
+
+class CreateGame(LoginRequiredMixin, CreateView):
+    model = Game
+    fields = ['name', 'users']
 
 
 @login_required
