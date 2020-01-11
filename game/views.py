@@ -9,13 +9,13 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import User
 # from django.core.exceptions import PermissionDenied
 # from django.http import HttpResponseBadRequest
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic.edit import CreateView
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 
 from .models import Game, GameState, build_initial_state
-
+7
 
 logger = logging.getLogger(__file__)
 
@@ -30,7 +30,7 @@ def lobby(request):
 class CreateGame(LoginRequiredMixin, CreateView):
     model = Game
     fields = ['name', 'users']
-    success_url = reverse('lobby')
+    success_url = 'lobby'
 
     def form_valid(form):
         #response = super().form_valid(form)
