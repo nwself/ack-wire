@@ -12,7 +12,7 @@ from django.contrib.auth.models import User
 from django.shortcuts import render, get_object_or_404
 from django.views.generic.edit import CreateView
 from django.utils.safestring import mark_safe
-
+from django.urls import reverse
 
 from .models import Game, GameState, build_initial_state
 
@@ -30,6 +30,12 @@ def lobby(request):
 class CreateGame(LoginRequiredMixin, CreateView):
     model = Game
     fields = ['name', 'users']
+    success_url = reverse('lobby')
+
+    def form_valid(form):
+        #response = super().form_valid(form)
+        start_game(form.instance.name, [u.username for u in form.instance.users])
+        return redirect(self.get_success_url())
 
 
 @login_required
