@@ -32,7 +32,7 @@ class CreateGame(LoginRequiredMixin, CreateView):
     fields = ['name', 'users']
     success_url = 'lobby'
 
-    def form_valid(form):
+    def form_valid(self, form):
         #response = super().form_valid(form)
         start_game(form.instance.name, [u.username for u in form.instance.users])
         return redirect(self.get_success_url())
