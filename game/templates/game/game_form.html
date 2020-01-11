@@ -15,7 +15,10 @@
 				    <link rel="stylesheet" href="{% static "css/game.css" %}">
 	</head>
 	<body>
-{{ form }}
-
+		<form action="{% url 'start-game-view' %}" method="post">
+			    {% csrf_token %}
+			        {{ form }}
+				    <input type="submit" value="Submit">
+		</form>
 	</body>
 
