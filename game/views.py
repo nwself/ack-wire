@@ -144,7 +144,7 @@ def start_game(game):
     #        logger.error("User does not exist {}".format(username))
     #        return None
     #    users.append(user)
-    users = game.users
+    users = game.users.all()
 
     state = build_initial_state(users)
 
