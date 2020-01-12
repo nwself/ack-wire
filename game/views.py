@@ -30,7 +30,7 @@ def lobby(request):
 class CreateGame(LoginRequiredMixin, CreateView):
     model = Game
     fields = ['name', 'users']
-    success_url = 'lobby'
+    success_url = ''
 
     def form_valid(self, form):
         response = super().form_valid(form)
