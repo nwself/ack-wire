@@ -33,9 +33,10 @@ class CreateGame(LoginRequiredMixin, CreateView):
     success_url = 'lobby'
 
     def form_valid(self, form):
-        #response = super().form_valid(form)
-        start_game(form.instance.name, [u.username for u in form.instance.users])
-        return redirect(self.get_success_url())
+        response = super().form_valid(form)
+        start_game(form.instance)
+        #return redirect(self.get_success_url())
+        return response
 
 
 @login_required
@@ -118,8 +119,9 @@ def game(request, game_pk):
 #     end_game: False     # used to end game when a player calls it
 # }
 
-
-def start_game(game_slug, usernames):
+# changed to just create the fisrt gamestate for an ezisting game to support tge createview better
+#def start_game(game_slug, usernames):
+def start_game(game):
     """Create a new game.
 
     Takes a list of players to put in this game.
@@ -134,14 +136,15 @@ def start_game(game_slug, usernames):
     Save this initial state to the model.
     Notify all.
     """
-    users = []
-    for username in usernames:
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
-            logger.error("User does not exist {}".format(username))
-            return None
-        users.append(user)
+    #users = []
+    #for username in usernames:
+    #    try:
+    #        user = User.objects.get(username=username)
+    #    except User.DoesNotExist:
+    #        logger.error("User does not exist {}".format(username))
+    #        return None
+    #    users.append(user)
+    users = game.users
 
     state = build_initial_state(users)
 
@@ -167,10 +170,10 @@ def start_game(game_slug, usernames):
         player['tiles'] = [draw_tile(state) for _ in range(6)]
 
     # Save game to database
-    game = Game.objects.create(name=game_slug)
-    for user in users:
-        game.users.add(user)
-    game.save()
+    #game = Game.objects.create(name=game_slug)
+    #for user in users:
+    #    game.users.add(user)
+    #game.save()
 
     # Save initial state to database
     GameState.objects.create(game=game, state=json.dumps(state))
