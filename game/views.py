@@ -15,7 +15,7 @@ from django.utils.safestring import mark_safe
 from django.urls import reverse
 
 from .models import Game, GameState, build_initial_state
-7
+
 
 logger = logging.getLogger(__file__)
 
@@ -30,7 +30,6 @@ def lobby(request):
 class CreateGame(LoginRequiredMixin, CreateView):
     model = Game
     fields = ['name', 'users']
-    success_url = '/'
 
     def form_valid(self, form):
         response = super().form_valid(form)

@@ -4,6 +4,7 @@ import string
 
 from django.conf import settings
 from django.db import models
+from django.urls import reverse
 
 
 class Game(models.Model):
@@ -12,6 +13,9 @@ class Game(models.Model):
 
     def get_active_state(self):
         return self.gamestate_set.all().order_by('-effective').first().get_state()
+
+    def get_absolute_url(self):
+        return reverse('game-view', kwargs={'game_pk': self.pk})
 
     def __str__(self):
         return self.name
