@@ -6,17 +6,36 @@
   <meta charset="utf-8"/>
   <meta name=viewport content="width=device-width, initial-scale=1">
   <title>ack-wire</title>
-  <script src="{% static "vendor/js/rivets.js" %}"></script>
+
+  <style type="text/css">
+    .container {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+    }
+  </style>
 </head>
 <body>
-  {% for game in current_games %}
-    <li><a href="{% url 'game-view' game.pk %}">{{ game.name }}, players [
-      {% for user in game.users.all %}
-        {{ user.username }},
+  <div class="container">
+    <div class="games">
+      <ul>
+      {% for game in current_games %}
+        <li><a href="{% url 'game-view' game.pk %}">{{ game.name }}, players [
+          {% for user in game.users.all %}
+            {{ user.username }},
+          {% endfor %}
+        ]</a></li>
       {% endfor %}
-    ]</a></li>
-  {% endfor %}
-  <a href="{% url 'start-game-view' %}">Start new game</a>
+      </ul>
+      <a href="{% url 'start-game-view' %}">Start new game</a>
+    </div>
+    <div class="user">
+      <ul>
+          <li>{{ user.username }}</li>
+          <li><a href="{% url 'account_change_password' %}">Change Password</a></li>
+          <li><a href="{% url 'account_logout' %}">Logout</a></li>
+      </ul>
+    </div>
+  </div>
 </body>
 
 </html>
