@@ -398,6 +398,7 @@ class PlayTileAction(TurnAction):
             else:
                 # TODO client need to prevent user from forming chains with no chains available
                 logger.error("{} plays {} to form chain but no available chains".format(player['username'], self.tile))
+                # TODO what if every tile forms a chain?!?!?
                 raise ActionForbiddenException("No available chains")
         else:
             # There must at least be one chain adjacent
