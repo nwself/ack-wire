@@ -4,6 +4,14 @@ main {
   justify-content: space-between;
 }
 
+#shop {
+  padding-bottom: 1em;
+}
+
+td.inactive {
+  color: gray;
+}
+
 td.island {
   background-color: black;
   color: white;

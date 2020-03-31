@@ -459,6 +459,7 @@ Tile.prototype.play = function (event, model) {
 function Chain(obj) {
     this.name = obj.name;
     this.size = obj.size;
+    this.swatch = this.name + " swatch";
 }
 
 Chain.prototype.declare = function (event, model) {
@@ -473,6 +474,8 @@ function Stock(obj) {
     this.count = obj.count;
     this.size = obj.size;
     this.swatch = this.name + " swatch";
+    this.safe = this.size >= 11;
+    this.inactive = this.size == 0;
 }
 
 Stock.prototype.getCost = function (event, model) {

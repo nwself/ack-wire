@@ -41,39 +41,15 @@
       </p>
     </div>
 
-    <div id="hand">
-      <table>
-        <tbody>
-        <tr>
-          <th>Hand</th>
-          <td rv-each-tile="app.hand" rv-on-click="tile.play">{ tile.coordinates }</td>
-        </tr>
-        </tbody>
-      </table>
-      <table>
-        <tbody>
-          <tr>
-            <th>Cash</th>
-            <td>${ app.player.cash }</td>
-          </tr>
-        </tbody>
-      </table>
-      <table>
-        <tbody>
-        <tr>
-          <th>Stocks</th>
-        </tr>
-        <tr rv-each-stock="app.playerStocks">
-          <td><span rv-class="stock.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> { stock.name }</td><td>{ stock.count }</td>
-        </tr>
-        </tbody>
-      </table>
-      <div rv-show="app.showEndGame">
-        <button rv-on-click="app.endGame">End Game</button>
-      </div>
-    </div>
-
     <div id="shop">
+      <div id="shop-chains" rv-show="app.showAvailableChains">
+        <ul>
+          <li rv-each-chain="app.availableChains">
+            <button rv-on-click="chain.declare"><span rv-class="chain.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> { chain.name }</button>
+          </li>
+        </ul>
+      </div>
+
       <div id="determine-winner" rv-show="app.showDetermineWinner">
         Choose order of merge. Uppermost chain will be the winner and will acquire any chains below it.
 
@@ -116,11 +92,6 @@
         </table>
         <button rv-on-click="app.stockDisposer.validate">Validate</button>
       </div>
-      <div id="shop-chains" rv-show="app.showAvailableChains">
-        <ul>
-          <li rv-each-chain="app.availableChains" rv-on-click="chain.declare">{ chain.name }</li>
-        </ul>
-      </div>
       <div id="shop-stocks" rv-show="app.showAvailableStocks">
         <table>
           <tbody>
@@ -144,6 +115,39 @@
       </div>
     </div>
 
+
+    <div id="hand">
+      <table>
+        <tbody>
+        <tr>
+          <th>Hand</th>
+          <td rv-each-tile="app.hand" rv-on-click="tile.play">{ tile.coordinates }</td>
+        </tr>
+        </tbody>
+      </table>
+      <table>
+        <tbody>
+          <tr>
+            <th>Cash</th>
+            <td>${ app.player.cash }</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <tbody>
+        <tr>
+          <th>Stocks</th>
+        </tr>
+        <tr rv-each-stock="app.playerStocks">
+          <td><span rv-class="stock.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> { stock.name }</td><td>{ stock.count }</td>
+        </tr>
+        </tbody>
+      </table>
+      <div rv-show="app.showEndGame">
+        <button rv-on-click="app.endGame">End Game</button>
+      </div>
+    </div>
+
     <div id="supply">
       <div id="supply-chains">
         <p>Supply Stocks</p>
@@ -161,7 +165,7 @@
           <tbody>
           <tr rv-each-stock="app.supplyStocks">
             <td rv-class="stock.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
-            <td>{ stock.name }</td>
+            <td rv-class-inactive="stock.inactive">{ stock.name } <span rv-show="stock.safe">(safe)</span></td>
             <td>${ stock.getCost < size | call stock }</td>
             <td>{ stock.size }</td>
             <td rv-each-player="app.players">{ app.getShareCount < players | call player.name stock.name }</td>
