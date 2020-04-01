@@ -32,6 +32,42 @@
       </table>
     </div>
 
+    <!-- HAND -->
+
+    <div id="hand">
+      <table>
+        <tbody>
+        <tr>
+          <th>Hand</th>
+          <td rv-each-tile="app.hand" rv-on-click="tile.play">{ tile.coordinates }</td>
+        </tr>
+        </tbody>
+      </table>
+      <table>
+        <tbody>
+          <tr>
+            <th>Cash</th>
+            <td>${ app.player.cash }</td>
+          </tr>
+        </tbody>
+      </table>
+      <table>
+        <tbody>
+        <tr>
+          <th>Stocks</th>
+        </tr>
+        <tr rv-each-stock="app.playerStocks">
+          <td><span rv-class="stock.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> { stock.name }</td><td>{ stock.count }</td>
+        </tr>
+        </tbody>
+      </table>
+      <div rv-show="app.showEndGame">
+        <button rv-on-click="app.endGame">End Game</button>
+      </div>
+    </div>
+
+    <!-- INSTRUCTION -->
+
     <div rv-show="app.gameEnded">
       <strong>GAME ENDED</strong>
     </div>
@@ -40,6 +76,8 @@
         { app.instruction }
       </p>
     </div>
+
+    <!-- SHOP -->
 
     <div id="shop">
       <div id="shop-chains" rv-show="app.showAvailableChains">
@@ -115,38 +153,7 @@
       </div>
     </div>
 
-
-    <div id="hand">
-      <table>
-        <tbody>
-        <tr>
-          <th>Hand</th>
-          <td rv-each-tile="app.hand" rv-on-click="tile.play">{ tile.coordinates }</td>
-        </tr>
-        </tbody>
-      </table>
-      <table>
-        <tbody>
-          <tr>
-            <th>Cash</th>
-            <td>${ app.player.cash }</td>
-          </tr>
-        </tbody>
-      </table>
-      <table>
-        <tbody>
-        <tr>
-          <th>Stocks</th>
-        </tr>
-        <tr rv-each-stock="app.playerStocks">
-          <td><span rv-class="stock.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> { stock.name }</td><td>{ stock.count }</td>
-        </tr>
-        </tbody>
-      </table>
-      <div rv-show="app.showEndGame">
-        <button rv-on-click="app.endGame">End Game</button>
-      </div>
-    </div>
+    <!-- SUPPLY -->
 
     <div id="supply">
       <div id="supply-chains">
