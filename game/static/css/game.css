@@ -12,6 +12,10 @@ td.inactive {
   color: gray;
 }
 
+#supply tbody tr:nth-child(odd) {
+  background-color: #ccc;
+}
+
 td.island {
   background-color: black;
   color: white;
@@ -19,6 +23,7 @@ td.island {
 
 td.in-hand {
   border: solid 1px black;
+  cursor: pointer;
 }
 
 span.Tower,
