@@ -19,6 +19,7 @@ td.island {
 
 td.in-hand {
   border: solid 1px black;
+  cursor: pointer;
 }
 
 span.Tower,
