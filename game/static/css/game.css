@@ -8,6 +8,10 @@ main {
   padding-bottom: 1em;
 }
 
+#hand td {
+  cursor: pointer;
+}
+
 td.inactive {
   color: gray;
 }
