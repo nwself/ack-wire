@@ -433,6 +433,7 @@ function Player(obj) {
     this.name = obj.username;
     this.stocks = obj.stocks;
     this.cash = obj.cash;
+    this.isme = app.player.username == this.name;
 }
 
 function Cell(obj) {

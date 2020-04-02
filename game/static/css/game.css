@@ -16,8 +16,28 @@ td.inactive {
   color: gray;
 }
 
+.isme {
+  background-color: #ccc6;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+#board td {
+  text-align: center;
+}
+
+#supply-chains table tbody td:nth-child(n+3) {
+  text-align: right;
+}
+
 #supply tbody tr:nth-child(odd) {
-  background-color: #ccc;
+  background-color: #ccc6;
+}
+
+ table td {
+  padding: 5px;
 }
 
 td.island {

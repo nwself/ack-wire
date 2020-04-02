@@ -175,7 +175,7 @@
             <td rv-class-inactive="stock.inactive">{ stock.name } <span rv-show="stock.safe">(safe)</span></td>
             <td>${ stock.getCost < size | call stock }</td>
             <td>{ stock.size }</td>
-            <td rv-each-player="app.players">{ app.getShareCount < players | call player.name stock.name }</td>
+            <td rv-each-player="app.players" rv-class-isme="player.isme">{ app.getShareCount < players | call player.name stock.name }</td>
             <td>{ stock.count }</td>
           </tr>
           <tr>
@@ -183,7 +183,7 @@
             <td>Cash</td>
             <td></td>
             <td></td>
-            <td rv-each-player="app.players">${ player.cash }</td>
+            <td rv-each-player="app.players" rv-class-isme="player.isme">${ player.cash }</td>
             <td></td>
           </tr>
           </tbody>
