@@ -17,7 +17,7 @@ td.inactive {
 }
 
 .isme {
-  background-color: #ccc6;
+  background-color: #7BAFD466;
 }
 
 table {
@@ -48,6 +48,7 @@ td.island {
 td.in-hand {
   border: solid 1px black;
   cursor: pointer;
+  background-color: #7BAFD466;
 }
 
 span.Tower,
