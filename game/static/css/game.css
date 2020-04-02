@@ -8,7 +8,7 @@ main {
   padding-bottom: 1em;
 }
 
-#hand td {
+#hand-tiles td {
   cursor: pointer;
 }
 
