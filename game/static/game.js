@@ -375,6 +375,7 @@ var fsm = new machina.Fsm({
         app.history = acquire.history.reverse();
 
         if (acquire.state.player == username || acquire.state.player == '') {
+            app.myturn = true;
             this.transition(acquire.state.state);
         } else {
             this.transition("waiting");
