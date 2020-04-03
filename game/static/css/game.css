@@ -1,7 +1,17 @@
 main {
-  display: flex;
+  padding-left: 3em;
+  /*display: flex;*/
   flex-wrap: wrap;
   justify-content: space-between;
+}
+
+#board-hand-shop {
+  display: flex;
+}
+
+#hand-shop {
+  padding-top: 2em;
+  padding-left: 2em;
 }
 
 #shop {
