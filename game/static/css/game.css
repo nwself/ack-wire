@@ -9,6 +9,7 @@ main {
   display: flex;
 }
 
+#shop,
 #hand-shop {
   padding-top: 2em;
   padding-left: 2em;
