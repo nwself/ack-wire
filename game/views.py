@@ -720,6 +720,7 @@ def get_stock_cost(state, chain):
     if count > 41:
         count = 41
 
+    initial = state['schedule'][count]
     return initial + state['chain_costs'][chain]
 
 
