@@ -16,3 +16,13 @@
 ## First time only
 
 Make yourself a superuser with `./manage.py createsuperuser` then you can go to `localhost:8000/admin` and see all the cool Django admin stuff.
+
+# TODOs
+- Major update of create game page
+    - Enforce that user creating game is in game
+    - Select2 or something reasonable for finding users to add to game
+    - Add optional config (stock names, price schedule, board size)
+- Sort lobby into active and completed games
+- Fix declare chain buttons for mobile
+  - Possibly change all buttons to some reasonable style & size, esp. stock buying +/-
+- Warn if buying less than 3 stocks and player still has money
