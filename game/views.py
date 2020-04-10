@@ -118,7 +118,7 @@ def game(request, game_pk):
 #     end_game: False     # used to end game when a player calls it
 # }
 
-# changed to just create the fisrt gamestate for an ezisting game to support tge createview better
+# changed to just create the first gamestate for an existing game to support the createview better
 #def start_game(game_slug, usernames):
 def start_game(game):
     """Create a new game.
