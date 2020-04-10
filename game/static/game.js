@@ -301,7 +301,12 @@ var fsm = new machina.Fsm({
             }
         },
         'waiting': {
-
+            _onEnter: function () {
+                app.myturn = false;
+            },
+            _onExit: function () {
+                app.myturn = true;
+            }
         }
     },
 
