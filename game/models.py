@@ -39,19 +39,29 @@ class GameState(models.Model):
 
 def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=25):
     if chains is None:
-        chains = ["Luxor", "Tower", "American", "Festival", "Worldwide", "Continental", "Imperial"]
+        chains = [
+            ("Luxor", 0),
+            ("Tower", 0),
+            ("American", 100),
+            ("Festival", 100),
+            ("Worldwide", 100),
+            ("Continental", 200),
+            ("Imperial", 200)
+        ]
 
     initial_state = {
-        'chains': {c: 0 for c in chains},
+        'chains': {c: 0 for c, _ in chains},
+        'schedule': [200, 200, 200, 300, 400, 500, 600, 600, 600, 600, 600, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 1000],
+        'chain_costs': {c: d for c, d in chains},
         'hotels': {},   # will look like "A10": "Festival"
         'players': [{
             'cash': 6000,
-            'stocks': {c: 0 for c in chains},
+            'stocks': {c: 0 for c, _ in chains},
             'tiles': [],
             'username': user.username,
         } for user in users],       # clients shouldn't have all of this
         'supply': {      # clients shouldn't have this
-            'stocks': {c: starting_stocks for c in chains},
+            'stocks': {c: starting_stocks for c, _ in chains},
             'tiles': [string.ascii_uppercase[i] + str(j + 1) for i in range(0, rows) for j in range(0, columns)]
         },
         'merging_chains': [],  # only on state if a merge is active

@@ -97,15 +97,8 @@ var app = {
             count = 41;
         }
 
-        var initial = stockCosts[count];
-
-        if (chainName === "American" || chainName === "Worldwide" || chainName === "Festival") {
-            return initial + 100;
-        } else if (chainName === "Imperial" || chainName === "Continental") {
-            return initial + 200;
-        }
-        console.log("Cost for", chainName, initial);
-        return initial;
+        var initial = fsm.acquire.schedule[count];
+        return initial + fsm.acquire.chain_costs[chainName];
     },
     cartCount: function (stock) {
         return app.stocksCart.reduce(function (prev, s) {
@@ -375,6 +368,7 @@ var fsm = new machina.Fsm({
         app.history = acquire.history.reverse();
 
         if (acquire.state.player == username || acquire.state.player == '') {
+            app.myturn = true;
             this.transition(acquire.state.state);
         } else {
             this.transition("waiting");
@@ -433,6 +427,7 @@ function Player(obj) {
     this.name = obj.username;
     this.stocks = obj.stocks;
     this.cash = obj.cash;
+    this.isme = app.player.username == this.name;
 }
 
 function Cell(obj) {

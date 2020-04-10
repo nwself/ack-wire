@@ -720,13 +720,8 @@ def get_stock_cost(state, chain):
     if count > 41:
         count = 41
 
-    initial = costs[count]
-
-    if chain == "American" or chain == "Worldwide" or chain == "Festival":
-        return initial + 100
-    elif chain == "Imperial" or chain == "Continental":
-        return initial + 200
-    return initial
+    initial = state['schedule'][count]
+    return initial + state['chain_costs'][chain]
 
 
 def convert_islands(state, chain):

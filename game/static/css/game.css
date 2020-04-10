@@ -1,7 +1,18 @@
 main {
-  display: flex;
+  padding-left: 3em;
+  /*display: flex;*/
   flex-wrap: wrap;
   justify-content: space-between;
+}
+
+#board-hand-shop {
+  display: flex;
+}
+
+#shop,
+#hand-shop {
+  padding-top: 2em;
+  padding-left: 2em;
 }
 
 #shop {
@@ -16,8 +27,28 @@ td.inactive {
   color: gray;
 }
 
+.isme {
+  background-color: #7BAFD466;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+#board td {
+  text-align: center;
+}
+
+#supply-chains table tbody td:nth-child(n+3) {
+  text-align: right;
+}
+
 #supply tbody tr:nth-child(odd) {
-  background-color: #ccc;
+  background-color: #ccc6;
+}
+
+ table td {
+  padding: 5px;
 }
 
 td.island {
@@ -28,6 +59,7 @@ td.island {
 td.in-hand {
   border: solid 1px black;
   cursor: pointer;
+  background-color: #7BAFD466;
 }
 
 span.Tower,
