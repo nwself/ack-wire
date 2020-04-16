@@ -275,7 +275,7 @@ class TurnAction(Action):
 
     def advance_to_buy_or_next(self):
         if (any([c for c in self.state['chains'] if self.state['chains'][c] > 0]) and
-                min([get_stock_cost(self.state, c) for c in self.state['chains']]) <= self.player['cash']):
+                min([get_stock_cost(self.state, c) for c in self.state['chains'] if self.state['chains'][c] > 0]) <= self.player['cash']):
             # If there are any active chains and player has enough cash go to buy_stocks state
             self.state['state']['state'] = 'buy_stocks'
         else:
