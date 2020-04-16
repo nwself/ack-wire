@@ -44,7 +44,7 @@
 
     <!-- HAND -->
 
-    <div id="hand">
+    <div id="hand" rv-class-myturn="app.myturn">
       <table id="hand-tiles">
         <tbody>
         <tr>
@@ -119,7 +119,7 @@
         <button rv-on-click="app.determineWinner">Validate</button>
       </div>
       <div id="dispose-stock" rv-show="app.showDisposeStocks">
-        { app.stockDisposer.winnerChain } wins the merger. { app.stockDisposer.defunctChain } is defunct.
+        { app.stockDisposer.winnerChain } (winner) takes over { app.stockDisposer.defunctChain } (defunct).
         <table>
           <tbody>
             <tr>

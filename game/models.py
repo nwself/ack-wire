@@ -10,6 +10,7 @@ from django.urls import reverse
 class Game(models.Model):
     name = models.SlugField(db_index=True)
     users = models.ManyToManyField(settings.AUTH_USER_MODEL)
+    double_tiles_variant = models.BooleanField(default=False)
 
     def get_active_state(self):
         return self.gamestate_set.all().order_by('-effective').first().get_state()
@@ -37,7 +38,7 @@ class GameState(models.Model):
         return "{} {}".format(self.game.name, self.effective)
 
 
-def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=25):
+def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=25, variants=[]):
     if chains is None:
         chains = [
             ("Luxor", 0),
@@ -74,7 +75,13 @@ def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=
             'state': "play_tile"    # this is state.state.state which is a stupid thing to call something
         },
         'end_game': False,     # used to end game when a player calls it
-        'history': []
+        'history': [],
+        'variants': []
     }
+
+    if 'double_tiles' in variants:
+        initial_state['variants'] = ['double_tiles']
+        initial_state['supply']['tiles'].extend(initial_state['supply']['tiles'])
+    
     random.shuffle(initial_state['supply']['tiles'])
     return initial_state

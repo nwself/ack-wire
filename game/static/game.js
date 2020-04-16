@@ -227,6 +227,7 @@ var fsm = new machina.Fsm({
                        cart: cart
                    }
                }));
+               this.transition('wait_for_server')
             },
 
             _onExit: function () {
@@ -300,6 +301,12 @@ var fsm = new machina.Fsm({
                 app.instruction = instruction;
             }
         },
+        'wait_for_server': {
+            // this empty state brought to you by the following:
+            //    if server tells us to transition to a state we are already
+            //    in, the fsm does nothing and _onEnter doesn't run for that state
+            //    only a problem for dispose_stock at the moment
+        },
         'waiting': {
             _onEnter: function () {
                 app.myturn = false;
@@ -324,7 +331,15 @@ var fsm = new machina.Fsm({
             app.player = app.player[0];
             app.hand = app.player.tiles.map(function (coordinates) {
                 // side effect time
-                acquire.hotels[coordinates] = 'in-hand';
+                if (acquire.hotels[coordinates]) {
+                    if (acquire.hotels[coordinates] == 'in-hand') {
+                        acquire.hotels[coordinates] = 'in-hand2x'
+                    } else {
+                        acquire.hotels[coordinates] += ' in-hand';
+                    }
+                } else {
+                    acquire.hotels[coordinates] = 'in-hand';
+                }
 
                 return new Tile({
                     coordinates: coordinates
@@ -441,7 +456,7 @@ function Cell(obj) {
 }
 
 Cell.prototype.play = function (event, model) {
-    if (event.target.classList.contains('in-hand')) {
+    if (event.target.classList.contains('in-hand') || event.target.classList.contains('in-hand2x')) {
         fsm.tileClicked(model.cell);
     }
 }

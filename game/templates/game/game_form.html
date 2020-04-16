@@ -1,26 +1,26 @@
 {% load static %}
 <!DOCTYPE html>
 <html>
-	<head>
-		  <meta charset="utf-8"/>
-		    <link rel="shortcut icon" href="https://theselfs.org/fcm/favicon.ico?v2" type="image/x-icon">
-		      <meta name=viewport content="width=device-width, initial-scale=1">
+<head>
+	<meta charset="utf-8"/>
+	<link rel="shortcut icon" href="https://theselfs.org/fcm/favicon.ico?v2" type="image/x-icon">
+	<meta name=viewport content="width=device-width, initial-scale=1">
 
-		        <title>ack-wire</title>
-			  <script src="{% static "vendor/js/websocket.min.js" %}"></script>
-			    <script src="{% static "vendor/js/lodash.min.js" %}"></script>
-			      <script src="{% static "vendor/js/machina.js" %}"></script>
-			        <script src="{% static "vendor/js/sightglass.js" %}"></script>
-				  <script src="{% static "vendor/js/rivets.full.js" %}"></script>
-				    <link rel="stylesheet" href="{% static "css/game.css" %}">
-	</head>
-	<body>
-		<form action="{% url 'start-game-view' %}" method="post">
-			    {% csrf_token %}
-			        {{ form }}
-				    <input type="submit" value="Submit">
-		</form>
+	<title>ack-wire</title>
+	<script src="{% static "vendor/js/websocket.min.js" %}"></script>
+	<script src="{% static "vendor/js/lodash.min.js" %}"></script>
+	<script src="{% static "vendor/js/machina.js" %}"></script>
+	<script src="{% static "vendor/js/sightglass.js" %}"></script>
+	<script src="{% static "vendor/js/rivets.full.js" %}"></script>
+	<link rel="stylesheet" href="{% static "css/game.css" %}">
+</head>
+<body>
+	<form action="{% url 'start-game-view' %}" method="post">
+		{% csrf_token %}
+		{{ form }}
+		<input type="submit" value="Submit">
+	</form>
 
-  <a href="{% url 'lobby' %}">Back to homepage</a>
-	</body>
+	<a href="{% url 'lobby' %}">Back to homepage</a>
+</body>
 
