@@ -137,9 +137,18 @@ td.Imperial2x {
   background-color: #CB1C42;
 }
 
+td.Tower.in-hand,
+td.Luxor.in-hand,
+td.American.in-hand,
+td.Festival.in-hand,
+td.Worldwide.in-hand,
+td.Continental.in-hand,
+td.Imperial.in-hand {
+  box-shadow: inset 0px 0px 0px 4px black;
+}
 
 td.in-hand2x {
-  background-color: #7BAFD466;
+  background-color: white;
   color: black;
   box-shadow: inset 0px 0px 0px 4px black;
   cursor: pointer;

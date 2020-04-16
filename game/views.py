@@ -34,7 +34,7 @@ class CreateGame(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         response = super().form_valid(form)
         variants = ['double_tiles'] if form.instance.double_tiles_variant else []
-        start_game(form.instance)
+        start_game(form.instance, variants=variants)
         #return redirect(self.get_success_url())
         return response
 
@@ -389,7 +389,11 @@ class PlayTileAction(TurnAction):
                 # Variant case, the tile is already down, just add 2x
                 # View and declare_chain are responsible for the rest
                 if state['hotels'][self.tile] == 'island':
-                    state['state']['state'] = 'declare_chain'
+                    if any([c for c in state['chains'] if state['chains'][c[:-2] if c.endswith('2x') else c] == 0]):
+                        # if there are available chains
+                        state['state']['state'] = 'declare_chain'
+                    else:
+                        raise ActionForbiddenException("No available chains")
                 else:
                     state['chains'][state['hotels'][self.tile]] += 1
                     self.advance_to_buy_or_next()
