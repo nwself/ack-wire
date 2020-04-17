@@ -11,6 +11,7 @@ class Game(models.Model):
     name = models.SlugField(db_index=True)
     users = models.ManyToManyField(settings.AUTH_USER_MODEL)
     double_tiles_variant = models.BooleanField(default=False)
+    no_2player_tile_draw_variant = models.BooleanField(default=False)
 
     def get_active_state(self):
         return self.gamestate_set.all().order_by('-effective').first().get_state()

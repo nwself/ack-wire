@@ -29,11 +29,17 @@ def lobby(request):
 
 class CreateGame(LoginRequiredMixin, CreateView):
     model = Game
-    fields = ['name', 'users', 'double_tiles_variant']
+    fields = ['name', 'users', 'double_tiles_variant', 'no_2player_tile_draw_variant']
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        variants = ['double_tiles'] if form.instance.double_tiles_variant else []
+        variants = []
+
+        if form.instance.double_tiles_variant:
+            variants.append('double_tiles')
+        if form.instance.no_2player_tile_draw_variant:
+            variants.append('no_2player_tile_draw_variant')
+
         start_game(form.instance, variants=variants)
         #return redirect(self.get_success_url())
         return response
@@ -926,7 +932,7 @@ def pay_bonuses(state):
 
     stock_holders = [p for p in state['players'] if p['stocks'][defunct_chain] > 0]
 
-    if len(state['players']) == 2:
+    if len(state['players']) == 2 and not 'no_2player_tile_draw_variant' in state['variants']:
         tile = state['supply']['tiles'][random.randint(0, len(state['supply']['tiles']))]
         stock_holders.append({
             'username': None,
