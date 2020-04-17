@@ -77,12 +77,12 @@ def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=
         },
         'end_game': False,     # used to end game when a player calls it
         'history': [],
-        'variants': []
+        'variants': variants
     }
 
     if 'double_tiles' in variants:
         initial_state['variants'] = ['double_tiles']
         initial_state['supply']['tiles'].extend(initial_state['supply']['tiles'])
-    
+
     random.shuffle(initial_state['supply']['tiles'])
     return initial_state
