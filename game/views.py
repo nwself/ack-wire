@@ -424,7 +424,16 @@ class PlayTileAction(TurnAction):
                     # TODO client need to prevent user from forming chains with no chains available
                     logger.error("{} plays {} to form chain but no available chains".format(player['username'], self.tile))
                     # TODO what if every tile forms a chain?!?!?
-                    raise ActionForbiddenException("No available chains")
+
+                    if all([n is not None and n != 'island' for n in neighbors]):
+                        # ALL TILES MAKE CHAIN BUT NONE AVAILABLE
+                        self.player['tiles'].append(draw_tile(self.state))
+                        state['supply']['tiles'].append(self.tile)
+                        random.shuffle(state['supply']['tiles'])
+                        state['history'].append(['discard_temporarily_unplayable_tile', self.player['username'], self.tile])
+                        history_added = True
+                    else:
+                        raise ActionForbiddenException("No available chains")
             else:
                 # There must at least be one chain adjacent
                 neighboring_chains = set([n[:-2] if n.endswith('2x') else n for n in neighbors if n is not None and not n.startswith('island')])
