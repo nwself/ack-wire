@@ -1,10 +1,27 @@
 from django import forms
+from django.contrib import auth
+from django.db.models import Q
+
+from django_select2 import forms as s2forms
 
 from .models import Game
 
-# This is currently unused, the CreateGame view in views makes its own form class 
-# via inheritance in Django code
+
+class NotMeWidget(s2forms.ModelSelect2MultipleWidget):
+    model = auth.get_user_model()
+    search_fields = ['username__istartswith']
+
+    def filter_queryset(self, request, term, queryset, **kwargs):
+        return super().filter_queryset(request, term, queryset, **kwargs).filter(
+            ~Q(username=request.user.username)
+        )
+
+
 class GameForm(forms.ModelForm):
     class Meta:
         model = Game
-        fields = ['name', 'users', 'double_tiles_variant']
+        fields = ['name', 'users', 'double_tiles_variant', 'no_2player_tile_draw_variant']
+
+        widgets = {
+            'users': NotMeWidget()
+        }

@@ -45,7 +45,6 @@ Twisted==20.3.0
 txaio==18.8.1
 urllib3==1.24.2
 wcwidth==0.1.7
-zope.interface==4.6.0
+zope.interface==5.1.0
 psycopg2>=2.7,<2.8 --no-binary psycopg2
 django-heroku
-

@@ -15,6 +15,7 @@ from django.utils.safestring import mark_safe
 from django.urls import reverse
 
 from .models import Game, GameState, build_initial_state
+from .forms import GameForm
 
 
 logger = logging.getLogger(__file__)
@@ -28,19 +29,18 @@ def lobby(request):
 
 
 class CreateGame(LoginRequiredMixin, CreateView):
-    model = Game
-    fields = ['name', 'users', 'double_tiles_variant', 'no_2player_tile_draw_variant']
+    # model = Game
+    # fields = ['name', 'users', 'double_tiles_variant', 'no_2player_tile_draw_variant']
+    form_class = GameForm
+    template_name = "game/game_form.html"
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        variants = []
+        # This is not the right way to do this, super saves then we save again :/
+        form.instance.users.add(self.request.user)
+        form.instance.save()
 
-        if form.instance.double_tiles_variant:
-            variants.append('double_tiles')
-        if form.instance.no_2player_tile_draw_variant:
-            variants.append('no_2player_tile_draw_variant')
-
-        start_game(form.instance, variants=variants)
+        start_game(form.instance, variants=form.instance.get_variants())
         #return redirect(self.get_success_url())
         return response
 
@@ -941,6 +941,9 @@ def pay_bonuses(state):
 
     stock_holders = [p for p in state['players'] if p['stocks'][defunct_chain] > 0]
 
+    # debug this http://ack-wire.herokuapp.com/admin/game/gamestate/2152/change/
+    # should pay both bonuses if 2 players tied for first
+
     if len(state['players']) == 2 and not 'no_2player_tile_draw_variant' in state['variants']:
         tile = state['supply']['tiles'][random.randint(0, len(state['supply']['tiles']))]
         stock_holders.append({
@@ -952,6 +955,14 @@ def pay_bonuses(state):
         })
 
     stock_holders.sort(key=lambda x: x['stocks'][defunct_chain], reverse=True)
+
+    # first_maj = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[0]['stocks'][defunct_chain]]
+    # if len(first_maj) > 1 or len(stock_holders) == 1:
+    #     bonus = majority_bonus + minority_bonus
+    #     for p in first_maj:
+    #         p['cash'] += int(math.ceil(bonus / 100.0)) * 100
+
+
 
     if len(stock_holders) == 1:
         # if there is only one stock holder, they get both bonuses

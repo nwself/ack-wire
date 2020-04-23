@@ -19,6 +19,16 @@ class Game(models.Model):
     def get_absolute_url(self):
         return reverse('game-view', kwargs={'game_pk': self.pk})
 
+    def get_variants(self):
+        variants = []
+        for field in [
+            'double_tiles_variant',
+            'no_2player_tile_draw_variant'
+        ]:
+            if self.__getattribute__(field):
+                variants.append(field)
+        return variants
+
     def __str__(self):
         return self.name
 
