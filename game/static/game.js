@@ -367,15 +367,17 @@ var fsm = new machina.Fsm({
             return new Player(player);
         });
 
-        app.playerStocks = Object.keys(app.player.stocks).filter(function (stockName) {
-            return app.player.stocks[stockName] > 0;
-        }).map(function (stockName) {
-            return {
-                name: stockName,
-                count: app.player.stocks[stockName],
-                swatch: stockName + " swatch"
-            };
-        });
+        if (app.player) {
+            app.playerStocks = Object.keys(app.player.stocks).filter(function (stockName) {
+                return app.player.stocks[stockName] > 0;
+            }).map(function (stockName) {
+                return {
+                    name: stockName,
+                    count: app.player.stocks[stockName],
+                    swatch: stockName + " swatch"
+                };
+            });
+        }
 
         app.supplyStocks = Object.keys(acquire.supply.stocks).map(function (stockName) {
             return new Stock({
@@ -387,7 +389,7 @@ var fsm = new machina.Fsm({
 
         app.history = acquire.history.reverse();
 
-        if (acquire.state.player == username || acquire.state.player == '') {
+        if (app.player && (acquire.state.player == username || acquire.state.player == '')) {
             app.myturn = true;
             this.transition(acquire.state.state);
         } else {
@@ -447,7 +449,7 @@ function Player(obj) {
     this.name = obj.username;
     this.stocks = obj.stocks;
     this.cash = obj.cash;
-    this.isme = app.player.username == this.name;
+    this.isme = (app.player ? app.player.username == this.name : false);
 }
 
 function Cell(obj) {
@@ -539,7 +541,7 @@ StockDisposer.prototype.sellIncome = function () {
     return this.disposeCart.sell * app.lookupChainCost(this.defunctChain);
 }
 StockDisposer.prototype.keepCount = function () {
-    return app.player.stocks[this.defunctChain] - this.disposeCart.trade - this.disposeCart.sell;
+    return (app.player ? app.player.stocks[this.defunctChain] - this.disposeCart.trade - this.disposeCart.sell : false);
 }
 StockDisposer.prototype.canTrade = function () {
     return this.keepCount() >= 2 && fsm.acquire.supply.stocks[this.winnerChain] > this.disposeCart.trade / 2;
