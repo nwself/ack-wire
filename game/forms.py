@@ -22,6 +22,10 @@ class GameForm(forms.ModelForm):
         model = Game
         fields = ['name', 'users', 'double_tiles_variant', 'no_2player_tile_draw_variant']
 
+        labels = {
+            'name': 'Game Name'
+        }
+
         widgets = {
             'users': NotMeWidget()
         }
