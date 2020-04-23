@@ -16,8 +16,11 @@ decorator==4.3.2
 defusedxml==0.5.0
 Django==2.2.10
 django-allauth==0.39.1
+django-appconf==1.0.4
+django-crispy-forms==1.9.0
 django-debug-toolbar==1.11
 django-environ==0.4.5
+django-select2==7.2.3
 hiredis==1.0.0
 hyperlink==18.0.0
 idna==2.8
