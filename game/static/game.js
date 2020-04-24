@@ -355,9 +355,24 @@ var fsm = new machina.Fsm({
             for (var j = 0; j < 12; j++) {
                 var coordinates = letters[i] + (j + 1);
 
+                var chain = null;
+                if (coordinates in acquire.hotels) {
+                    chain = acquire.hotels[coordinates]
+                }
+                if (app.player && 
+                        (app.player.temp_unplayable_tiles && app.player.temp_unplayable_tiles.indexOf(coordinates) != -1)) {
+                        // app.player.unplayable_tiles && app.player.unplayable_tiles.indexOf(coordinates) != -1)) {
+                    if (chain == 'in-hand') {
+                        chain = 'unplayable';
+                    }
+                    if (chain == 'in-hand2x') {
+                        chain = 'unplayable2x';
+                    }
+                }
+
                 row.push(new Cell({
                     coordinates: coordinates,
-                    chain: ((coordinates in acquire.hotels) ? acquire.hotels[coordinates] : null),
+                    chain: chain,
                 }));
             }
             app.board.push(row);

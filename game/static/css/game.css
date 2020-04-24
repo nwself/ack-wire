@@ -66,6 +66,11 @@ td.in-hand {
   background-color: #7BAFD466;
 }
 
+td.unplayable {
+  border: solid 1px black;
+  background-color: lightgray;
+}
+
 span.Tower,
 td.Tower {
   background-color: #ffdc62;
@@ -152,6 +157,11 @@ td.in-hand2x {
   color: black;
   box-shadow: inset 0px 0px 0px 4px black;
   cursor: pointer;
+}
+td.unplayable2x {
+  background-color: lightgray;
+  color: black;
+  box-shadow: inset 0px 0px 0px 4px black;
 }
 td.island2x {
   background-color: white;

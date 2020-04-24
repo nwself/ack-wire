@@ -23,8 +23,15 @@ logger = logging.getLogger(__file__)
 
 @login_required
 def lobby(request):
+    games = request.user.game_set.all().order_by('-pk')
+
+    groups = {True: [], False: []}  # who knew you could do this?
+    for game in games:
+        groups[game.game_over()].append(game)
+
     return render(request, 'games/lobby.html', {
-        'current_games': request.user.game_set.all()
+        'current_games': groups[False],
+        'finished_games': groups[True]
     })
 
 
@@ -56,6 +63,7 @@ def game(request, game_pk):
     del state['supply']['tiles']
 
     return render(request, 'games/game.html', {
+        'game': game,
         'game_name_json': mark_safe(json.dumps(game_pk)),
         'game_state_json': mark_safe(json.dumps(state))
     })
@@ -292,10 +300,39 @@ class TurnAction(Action):
             else:
                 # There are no active chains so draw a tile and it's next player's turn
                 self.player['tiles'].append(draw_tile(self.state))
-                self.state['state'] = {
-                    'state': 'play_tile',
-                    'player': next_player(self.state)
-                }
+                self.transition_to_play_tile()
+
+    def transition_to_play_tile(self):
+        next_player_name = next_player(self.state)
+
+        self.state['state'] = {
+            'state': 'play_tile',
+            'player': next_player_name
+        }
+
+        player = pluck_player(self.state, next_player_name)
+        player['unplayable_tiles'] = []
+        player['temp_unplayable_tiles'] = []
+
+        active_chain_count = len([c for c in self.state['chains'] if self.state['chains'][c] > 0])
+        print("Number of active_chains {}".format(active_chain_count))
+
+        for tile in player['tiles']:
+            # permanently unplayable because would merge two safe chains
+            neighbors = get_neighboring_assignments(self.state, tile)
+            neighboring_chains = set([n[:-2] if n.endswith('2x') else n for n in neighbors if n is not None and not n.startswith('island')])
+            safe_neighbors = [n for n in neighboring_chains if self.state['chains'][n[:-2] if n.endswith('2x') else n] >= 11]
+            if len(safe_neighbors) >= 2:
+                print("{} is permanently unplayable".format(tile))
+                player['unplayable_tiles'].append(tile)
+
+            # temporarily unplayable tiles would create chain when none available
+            if active_chain_count == len(self.state['chains']):
+                # if this tile is adjacent to island but not chain
+                if 'island' in neighbors and not neighboring_chains:
+                    print("{} is temporarily unplayable".format(tile))
+                    player['temp_unplayable_tiles'].append(tile)
+
 
     def prepare_merger(self, state):
         """Modify state to start mergering.
@@ -392,19 +429,19 @@ class PlayTileAction(TurnAction):
         history_added = False
 
         if 'double_tiles' in state['variants'] and self.tile in state['hotels']:
-                # Variant case, the tile is already down, just add 2x
-                # View and declare_chain are responsible for the rest
-                if state['hotels'][self.tile] == 'island':
-                    if any([c for c in state['chains'] if state['chains'][c[:-2] if c.endswith('2x') else c] == 0]):
-                        # if there are available chains
-                        state['state']['state'] = 'declare_chain'
-                    else:
-                        raise ActionForbiddenException("No available chains")
+            # Variant case, the tile is already down, just add 2x
+            # View and declare_chain are responsible for the rest
+            if state['hotels'][self.tile] == 'island':
+                if any([c for c in state['chains'] if state['chains'][c[:-2] if c.endswith('2x') else c] == 0]):
+                    # if there are available chains
+                    state['state']['state'] = 'declare_chain'
                 else:
-                    state['chains'][state['hotels'][self.tile]] += 1
-                    self.advance_to_buy_or_next()
-                
-                state['hotels'][self.tile] = '{}2x'.format(state['hotels'][self.tile])
+                    raise ActionForbiddenException("No available chains")
+            else:
+                state['chains'][state['hotels'][self.tile]] += 1
+                self.advance_to_buy_or_next()
+            
+            state['hotels'][self.tile] = '{}2x'.format(state['hotels'][self.tile])
         else:
             # NOT a variant
             # Prep for computations by getting active cell's neighbors
@@ -591,10 +628,7 @@ class BuyStocksAction(TurnAction):
         # Else
         # Set state to "play_tile,next_player()"  # where do we change state.current_player? maybe only need it globally for merging so merging_player?
         # Notify other players
-        self.state['state'] = {
-            'state': 'play_tile',
-            'player': next_player(self.state)
-        }
+        self.transition_to_play_tile()
 
         GameState.objects.create(game=self.game, state=json.dumps(self.state))
         return self.state

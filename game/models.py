@@ -14,10 +14,19 @@ class Game(models.Model):
     no_2player_tile_draw_variant = models.BooleanField(default=False)
 
     def get_active_state(self):
-        return self.gamestate_set.all().order_by('-effective').first().get_state()
+        state = self.gamestate_set.all().order_by('-effective').first()
+        return state.get_state() if state else None
 
     def get_absolute_url(self):
         return reverse('game-view', kwargs={'game_pk': self.pk})
+
+    def game_over(self):
+        state = self.get_active_state()
+        return state['state']['state'] == 'end_game' if state else True
+
+    def get_winner(self):
+        state = self.get_active_state()
+        return sorted(state['players'], key=lambda x: x['cash'], reverse=True)[0]['username'] if state else ''
 
     def get_variants(self):
         variants = []
