@@ -99,8 +99,7 @@ def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=
         'variants': variants
     }
 
-    if 'double_tiles' in variants:
-        initial_state['variants'] = ['double_tiles']
+    if 'double_tiles_variant' in variants:
         initial_state['supply']['tiles'].extend(initial_state['supply']['tiles'])
 
     random.shuffle(initial_state['supply']['tiles'])

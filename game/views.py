@@ -428,7 +428,7 @@ class PlayTileAction(TurnAction):
         player['tiles'].remove(self.tile)
         history_added = False
 
-        if 'double_tiles' in state['variants'] and self.tile in state['hotels']:
+        if 'double_tiles_variant' in state['variants'] and self.tile in state['hotels']:
             # Variant case, the tile is already down, just add 2x
             # View and declare_chain are responsible for the rest
             if state['hotels'][self.tile] == 'island':
