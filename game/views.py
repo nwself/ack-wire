@@ -282,6 +282,7 @@ class TurnAction(Action):
             else:
                 # all merging is done
                 resolve_merge(self.state)
+                update_unplayable_tiles(self.state)
                 self.player = pluck_player(self.state, self.state['merging_player'])
                 self.advance_to_buy_or_next()
         else:
@@ -299,7 +300,7 @@ class TurnAction(Action):
                 return self.state
             else:
                 # There are no active chains so draw a tile and it's next player's turn
-                self.player['tiles'].append(draw_tile(self.state))
+                draw_tile_for_player(self.state, self.player)
                 self.transition_to_play_tile()
 
     def transition_to_play_tile(self):
@@ -435,6 +436,7 @@ class PlayTileAction(TurnAction):
                 if any([c for c in state['chains'] if state['chains'][c[:-2] if c.endswith('2x') else c] == 0]):
                     # if there are available chains
                     state['state']['state'] = 'declare_chain'
+                    update_unplayable_tiles(state)
                 else:
                     raise ActionForbiddenException("No available chains")
             else:
@@ -457,14 +459,14 @@ class PlayTileAction(TurnAction):
                     # If there are available chains in the supply
                     state['hotels'][self.tile] = 'island'
                     state['state']['state'] = 'declare_chain'
+                    update_unplayable_tiles(state)
                 else:
-                    # TODO client need to prevent user from forming chains with no chains available
-                    logger.error("{} plays {} to form chain but no available chains".format(player['username'], self.tile))
-                    # TODO what if every tile forms a chain?!?!?
-
-                    if all([n is not None and n != 'island' for n in neighbors]):
+                    # Because tile is already removed from hand, temp unplayable
+                    # Will be one greater than current hand if all are temp unplayable
+                    if len(self.player['temp_unplayable_tiles']) == len(self.player['tiles']) + 1:
                         # ALL TILES MAKE CHAIN BUT NONE AVAILABLE
-                        self.player['tiles'].append(draw_tile(self.state))
+                        print("Gotta discard this because all unplayabel")
+                        draw_tile_for_player(self.state, self.player)
                         state['supply']['tiles'].append(self.tile)
                         random.shuffle(state['supply']['tiles'])
                         state['history'].append(['discard_temporarily_unplayable_tile', self.player['username'], self.tile])
@@ -490,9 +492,7 @@ class PlayTileAction(TurnAction):
                         # just draw a new tile
                         state['history'].append(['discard_unplayable_tile', self.tile])
                         history_added = True
-                        self.player['tiles'].append(draw_tile(self.state))
-                        # logger.error("Cannot play {} because 2+ neighboring chains are safe".format(self.tile))
-                        # raise ActionForbiddenException()
+                        draw_tile_for_player(self.state, self.player)
                     else:
                         state['history'].append([
                             'play_tile',
@@ -616,7 +616,7 @@ class BuyStocksAction(TurnAction):
         # # Draw Tile
         # Call draw_tile
         # Add drawn tile to players hand
-        self.player['tiles'].append(draw_tile(self.state))
+        draw_tile_for_player(self.state, self.player)
 
         # # End Turn
         # If end_game flag is True
@@ -918,6 +918,35 @@ def draw_tile(state):
     Return drawn tile
     """
     return state['supply']['tiles'].pop()
+
+
+def draw_tile_for_player(state, player):
+    player['tiles'].append(draw_tile(state))
+    update_unplayable_tiles(state)
+
+
+def update_unplayable_tiles(state):
+    for player in state['players']:
+        # player = pluck_player(self.state, next_player_name)
+        player['unplayable_tiles'] = []
+        player['temp_unplayable_tiles'] = []
+
+        active_chain_count = len([c for c in state['chains'] if state['chains'][c] > 0])
+
+        for tile in player['tiles']:
+            # permanently unplayable because would merge two safe chains
+            neighbors = get_neighboring_assignments(state, tile)
+            neighboring_chains = set([n[:-2] if n.endswith('2x') else n for n in neighbors if n is not None and not n.startswith('island')])
+            safe_neighbors = [n for n in neighboring_chains if state['chains'][n[:-2] if n.endswith('2x') else n] >= 11]
+            if len(safe_neighbors) >= 2:
+                print("{} is permanently unplayable".format(tile))
+                player['unplayable_tiles'].append(tile)
+
+            # temporarily unplayable tiles would create chain when none available
+            if active_chain_count == len(state['chains']):
+                # if this tile is adjacent to island but not chain
+                if 'island' in neighbors and not neighboring_chains:
+                    player['temp_unplayable_tiles'].append(tile)
 
 
 def pluck_player(state, username):

@@ -41,6 +41,7 @@ table {
 
 #board td {
   text-align: center;
+  user-select: none;
 }
 
 #supply-chains table tbody td:nth-child(n+3) {
@@ -68,6 +69,7 @@ td.in-hand {
 
 td.unplayable {
   border: solid 1px black;
+  cursor: pointer;
   background-color: lightgray;
 }
 
@@ -161,6 +163,7 @@ td.in-hand2x {
 td.unplayable2x {
   background-color: lightgray;
   color: black;
+  cursor: pointer;
   box-shadow: inset 0px 0px 0px 4px black;
 }
 td.island2x {

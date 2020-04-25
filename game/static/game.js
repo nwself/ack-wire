@@ -473,7 +473,10 @@ function Cell(obj) {
 }
 
 Cell.prototype.play = function (event, model) {
-    if (event.target.classList.contains('in-hand') || event.target.classList.contains('in-hand2x')) {
+    if (event.target.classList.contains('in-hand') ||
+        event.target.classList.contains('in-hand2x') ||
+        event.target.classList.contains('unplayable') ||
+        event.target.classList.contains('unplayable2x')) {
         fsm.tileClicked(model.cell);
     }
 }
