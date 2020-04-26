@@ -412,6 +412,57 @@ var fsm = new machina.Fsm({
             app.instruction = "Waiting for " + acquire.state.player + " to " + acquire.state.state;
         }
 
+        var columns = Object.keys(acquire.chain_costs).reduce(function (prev, curr) {
+            if (!prev) { prev = {}; }
+            if (!(acquire.chain_costs[curr] in prev)) {
+                prev[acquire.chain_costs[curr]] = [];
+            }
+            prev[acquire.chain_costs[curr]].push(curr);
+            return prev;
+        }, {});
+
+        app.scheduleColumns = Object.values(columns).map(function (group) {
+            return group.join('\n');
+        });
+
+        var ranges = acquire.schedule.reduce(function (prev, cost, i) {
+            if (prev.length == 0 || prev[prev.length - 1].cost != cost) {
+                if (prev.length > 0) {
+                    prev[prev.length - 1].end = i - 1;
+                }
+                prev.push({
+                    cost: cost,
+                    start: i
+                });
+            }
+            return prev;
+        }, []);
+
+        var hotels = ranges.map(function (range) {
+            var hotels = range.end;
+            if (range.start != range.end && range.start != 0) {
+                hotels = range.start + "-" + range.end;
+
+                if (!range.end) {
+                    hotels = range.start + "+";
+                }
+            }
+            return hotels;
+        });
+
+        ranges.push(ranges[ranges.length - 1]);
+        ranges.push(ranges[ranges.length - 1]);
+        app.schedule = ranges.map(function (range, i) {
+            return [
+                (i < hotels.length ? hotels[i] : "-"),
+                (i - 1 > 0 && i - 1 < hotels.length ? hotels[i - 1] : "-"),
+                (i - 2 > 0 ? hotels[i - 2] : "-"),
+                '$' + numberWithCommas(range.cost),
+                '$' + numberWithCommas(range.cost * 100),
+                '$' + numberWithCommas(range.cost * 50)
+            ];
+        })
+
         fsm.checkForEnd(acquire.chains);
     },
 
@@ -600,6 +651,11 @@ rivets.formatters.historyFormatter = function(value){
 document.addEventListener("DOMContentLoaded", function() {
     rivets.bind(document.getElementById("main"), {app: app});
 });
+
+function numberWithCommas(x) {
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 
 // // represents the stata and is synced with/bound to the HTML rivets template
 // var app = {

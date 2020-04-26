@@ -216,6 +216,24 @@
     </ul>
   </div>
 
+  <div id="schedule">
+    <table>
+      <thead>
+        <tr>
+          <th rv-each-group="app.scheduleColumns">{ group }</th>
+          <th>Stock Buying/Selling Price per Block</th>
+          <th>First Bonus</th>
+          <th>Second Bonus</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr rv-each-row="app.schedule">
+          <td rv-each-item="row">{ item }</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
   <script type="text/javascript">
   var roomName = {{ game_name_json }};
   var initialStateJson = {{ game_state_json }};
