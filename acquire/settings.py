@@ -203,3 +203,12 @@ if os.environ.get("REDIS_URL"):
     django_heroku.settings(locals())
 
     DATABASES['default']['CONN_MAX_AGE'] = 0
+
+    INSTALLED_APPS += ["anymail"]
+
+    EMAIL_BACKEND = "anymail.backends.mailjet.EmailBackend"
+    ANYMAIL = {
+        "MAILJET_API_KEY": os.environ.get("MAILJET_API_KEY"),
+        "MAILJET_SECRET_KEY": os.environ.get("MAILJET_SECRET_KEY"),
+        "MAILJET_API_URL": "https://api.mailjet.com/v3",
+    }

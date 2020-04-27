@@ -16,6 +16,7 @@ decorator==4.3.2
 defusedxml==0.5.0
 Django==2.2.10
 django-allauth==0.39.1
+django-anymail[mailjet]==7.1.0
 django-appconf==1.0.4
 django-crispy-forms==1.9.0
 django-debug-toolbar==1.11
