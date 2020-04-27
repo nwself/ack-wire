@@ -422,7 +422,7 @@ var fsm = new machina.Fsm({
         }, {});
 
         app.scheduleColumns = Object.values(columns).map(function (group) {
-            return group.join('\n');
+            return group.join('<br/>');
         });
 
         var ranges = acquire.schedule.reduce(function (prev, cost, i) {
