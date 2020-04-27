@@ -206,7 +206,9 @@ if os.environ.get("REDIS_URL"):
 
     INSTALLED_APPS += ["anymail"]
 
+    DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL")
     EMAIL_BACKEND = "anymail.backends.mailjet.EmailBackend"
+    EMAIL_SUBJECT_PREFIX = "[ack-wire]"
     ANYMAIL = {
         "MAILJET_API_KEY": os.environ.get("MAILJET_API_KEY"),
         "MAILJET_SECRET_KEY": os.environ.get("MAILJET_SECRET_KEY"),
