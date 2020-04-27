@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.discord',
     'debug_toolbar',
-    'django_extensions',
+    # 'django_extensions',
     'channels',
     'crispy_forms',
     'django_select2',
