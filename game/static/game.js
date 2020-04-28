@@ -370,7 +370,7 @@ var fsm = new machina.Fsm({
                     }
                 }
 
-                if (chain in acquire.chains) {
+                if (chain && (chain in acquire.chains || chain.slice(0, -2) in acquire.chains)) {
                     coordinates = chain[0];
                 }
                 row.push(new Cell({
