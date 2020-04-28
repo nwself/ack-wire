@@ -345,6 +345,7 @@ var fsm = new machina.Fsm({
                     coordinates: coordinates
                 });
             });
+            app.player.cash = numberWithCommas(app.player.cash);
         } else {
             app.player = null;
         }
@@ -370,8 +371,11 @@ var fsm = new machina.Fsm({
                     }
                 }
 
-                if (chain && (chain in acquire.chains || chain.slice(0, -2) in acquire.chains)) {
+                if (chain && (chain in acquire.chains)) {
                     coordinates = chain[0];
+                }
+                if (chain && chain.slice(0, -2) in acquire.chains) {
+                    coordinates = chain[0] + "<sub>2</sub>";
                 }
                 row.push(new Cell({
                     coordinates: coordinates,

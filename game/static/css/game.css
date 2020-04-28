@@ -192,6 +192,7 @@ td.island2x {
   box-shadow: inset 0px 0px 0px 4px black;
 }
 
+/* test unplayable in-hand island http://ack-wire.herokuapp.com/admin/game/gamestate/2935/change/ */
 td.in-hand.island {
   color: black;
   box-shadow: inset 0px 0px 0px 4px black;

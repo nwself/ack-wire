@@ -33,7 +33,7 @@
       <table>
         <tbody>
           <tr rv-each-row="app.board">
-            <td rv-each-cell="row" rv-class="cell.chain" rv-on-click="cell.play">{ cell.coordinates }</td>
+            <td rv-each-cell="row" rv-class="cell.chain" rv-on-click="cell.play" rv-html="cell.coordinates"></td>
           </tr>
         </tbody>
       </table>
@@ -176,9 +176,8 @@
 
     <!-- SUPPLY -->
 
-    <div id="supply">
+    <div id="supply" class="mt-4">
       <div id="supply-chains">
-        <p>Supply Stocks</p>
         <table>
           <thead>
             <tr>
