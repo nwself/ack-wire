@@ -345,7 +345,7 @@ var fsm = new machina.Fsm({
                     coordinates: coordinates
                 });
             });
-            app.player.cash = numberWithCommas(app.player.cash);
+            // app.player.cash = numberWithCommas(app.player.cash);
         } else {
             app.player = null;
         }
