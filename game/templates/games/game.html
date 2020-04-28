@@ -74,9 +74,6 @@
         </tr>
         </tbody>
       </table>
-      <div rv-show="app.showEndGame">
-        <button rv-on-click="app.endGame">End Game</button>
-      </div>
     </div>
 
     <!-- INSTRUCTION -->
@@ -100,7 +97,7 @@
       <div id="shop-chains" rv-show="app.showAvailableChains">
         <ul>
           <li rv-each-chain="app.availableChains">
-            <button rv-on-click="chain.declare"><span rv-class="chain.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> { chain.name }</button>
+            <button class="btn btn-outline-secondary" rv-on-click="chain.declare"><span rv-class="chain.swatch">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> { chain.name }</button>
           </li>
         </ul>
       </div>
@@ -114,12 +111,12 @@
               <td>{ chain.order }</td>
               <td>{ chain.name }</td>
               <td>{ chain.size }</td>
-              <td><button rv-on-click="chain.up" rv-enabled="chain.canUp < order | call chain">up</button></td>
-              <td><button rv-on-click="chain.down" rv-enabled="chain.canDown < order | call chain">down</button></td>
+              <td><button class="btn btn-primary" rv-on-click="chain.up" rv-enabled="chain.canUp < order | call chain">up</button></td>
+              <td><button class="btn btn-primary" rv-on-click="chain.down" rv-enabled="chain.canDown < order | call chain">down</button></td>
             </tr>
           </tbody>
         </table>
-        <button rv-on-click="app.determineWinner">Validate</button>
+        <button class="btn btn-outline-primary" rv-on-click="app.determineWinner">Declare { app.mergingChains | firstName } winner</button>
       </div>
       <div id="dispose-stock" rv-show="app.showDisposeStocks">
         { app.stockDisposer.winnerChain } (winner) takes over { app.stockDisposer.defunctChain } (defunct).
@@ -128,15 +125,15 @@
             <tr>
               <th>Trade</th>
               <td>{ app.stockDisposer.disposeCart.trade }</td>
-              <td><button rv-on-click="app.stockDisposer.tradeIncrement" rv-enabled="app.stockDisposer.canTrade < disposeCart.sell disposeCart.trade | call">+</button></td>
-              <td><button rv-on-click="app.stockDisposer.tradeDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.trade">-</button></td>
+              <td><button class="btn btn-primary" rv-on-click="app.stockDisposer.tradeIncrement" rv-enabled="app.stockDisposer.canTrade < disposeCart.sell disposeCart.trade | call">+</button></td>
+              <td><button class="btn btn-primary" rv-on-click="app.stockDisposer.tradeDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.trade">-</button></td>
               <td>{ app.stockDisposer.tradeIncome < disposeCart.trade | call }</td>
             </tr>
             <tr>
               <th>Sell</th>
               <td>{ app.stockDisposer.disposeCart.sell }</td>
-              <td><button rv-on-click="app.stockDisposer.sellIncrement" rv-enabled="app.stockDisposer.canSell < disposeCart.sell disposeCart.trade | call">+</button></td>
-              <td><button rv-on-click="app.stockDisposer.sellDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.sell">-</button></td>
+              <td><button class="btn btn-primary" rv-on-click="app.stockDisposer.sellIncrement" rv-enabled="app.stockDisposer.canSell < disposeCart.sell disposeCart.trade | call">+</button></td>
+              <td><button class="btn btn-primary" rv-on-click="app.stockDisposer.sellDecrement" rv-disabled="app.isZero | call app.stockDisposer.disposeCart.sell">-</button></td>
               <td>${ app.stockDisposer.sellIncome < disposeCart.sell | call }</td>
             </tr>
             <tr>
@@ -145,7 +142,7 @@
             </tr>
           </tbody>
         </table>
-        <button rv-on-click="app.stockDisposer.validate">Validate</button>
+        <button class="btn btn-outline-primary" rv-on-click="app.stockDisposer.validate">Validate</button>
       </div>
       <div id="shop-stocks" rv-show="app.showAvailableStocks">
         <table>
@@ -156,8 +153,8 @@
               <td>{ stock.name }</td>
               <td>${ stock.getCost < size | call stock }</td>
               <td>{ stock.size }</td>
-              <td><button rv-on-click="stock.increment" rv-enabled="app.canAddStock < stocksCart | call stock">+</button></td>
-              <td><button rv-on-click="stock.decrement" rv-disabled="app.hasNone < stocksCart | call stock">-</button></td>
+              <td><button class="btn btn-primary" rv-on-click="stock.increment" rv-enabled="app.canAddStock < stocksCart | call stock">+</button></td>
+              <td><button class="btn btn-primary" rv-on-click="stock.decrement"  rv-disabled="app.hasNone < stocksCart | call stock">-</button></td>
             </tr>
           </tbody>
         </table>
@@ -165,8 +162,12 @@
           <p>
             Total cost: ${ app.totalCost < stocksCart | call }
           </p>
-          <button rv-on-click="app.buyStocks">Validate</button>
+          <button class="btn btn-outline-primary" rv-on-click="app.buyStocks">Buy { app.stocksCart | stocksLength }</button>
+          <br>
         </div>
+      </div>
+      <div rv-show="app.showEndGame">
+        <button class="btn btn-outline-primary" rv-on-click="app.endGame">Declare End of Game</button>
       </div>
     </div>
 

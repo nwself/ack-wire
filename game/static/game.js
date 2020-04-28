@@ -480,7 +480,10 @@ var fsm = new machina.Fsm({
         }, false);
         if (allSafe || over41) {
             console.log("allSafe", allSafe, "over41", over41);
-            app.showEndGame = true;
+            if (app.myturn && !fsm.acquire.end_game) {
+                console.log("myturn", app.myturn, "gameEnded", fsm.acquire.end_game);
+                app.showEndGame = true;
+            }
         }
         app.gameEnded = fsm.acquire.end_game;
     },
@@ -650,6 +653,17 @@ rivets.formatters.historyFormatter = function(value){
   }
   return value;
 }
+
+rivets.formatters.stocksLength = function(value)
+{
+  var length = value ? (value.length || 0) : 0;
+  return length == 1 ? "1 stock" : length + " stocks"
+};
+
+rivets.formatters.firstName = function(value)
+{
+  return value && value.length > 0 ? value[0].name : '';
+};
 
 document.addEventListener("DOMContentLoaded", function() {
     rivets.bind(document.getElementById("main"), {app: app});

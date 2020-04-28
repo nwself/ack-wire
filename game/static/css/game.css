@@ -13,6 +13,20 @@ main {
   background-color: #d2dbe166;
 }
 
+#shop button.btn-outline-secondary {
+  color: black;
+}
+
+#shop button.btn-outline-secondary:hover {
+  background-color: #7BAFD466;
+}
+
+#shop button.btn.btn-primary {
+  border: none;
+  background-color: #7BAFD466;
+  color: inherit;
+}
+
 #shop,
 #hand-shop {
   padding-top: 2em;
@@ -42,6 +56,12 @@ table {
 #board td {
   text-align: center;
   user-select: none;
+}
+
+#shop button.btn:disabled {
+  border: none;
+  background-color: inherit;
+  color: inherit;
 }
 
 #supply-chains table tbody td:nth-child(n+3) {
