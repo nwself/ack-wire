@@ -374,9 +374,10 @@ var fsm = new machina.Fsm({
                 if (chain && (chain in acquire.chains)) {
                     coordinates = chain[0];
                 }
-                if (chain && chain.slice(0, -2) in acquire.chains) {
+                if (chain && (chain.slice(0, -2) in acquire.chains)) {
                     coordinates = chain[0] + "<sub>2</sub>";
                 }
+                // sub 2 not worknig here http://ack-wire.herokuapp.com/admin/game/gamestate/3090/change/
                 row.push(new Cell({
                     coordinates: coordinates,
                     chain: chain,
