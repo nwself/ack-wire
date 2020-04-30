@@ -310,30 +310,7 @@ class TurnAction(Action):
             'state': 'play_tile',
             'player': next_player_name
         }
-
-        player = pluck_player(self.state, next_player_name)
-        player['unplayable_tiles'] = []
-        player['temp_unplayable_tiles'] = []
-
-        active_chain_count = len([c for c in self.state['chains'] if self.state['chains'][c] > 0])
-        print("Number of active_chains {}".format(active_chain_count))
-
-        for tile in player['tiles']:
-            # permanently unplayable because would merge two safe chains
-            neighbors = get_neighboring_assignments(self.state, tile)
-            neighboring_chains = set([n[:-2] if n.endswith('2x') else n for n in neighbors if n is not None and not n.startswith('island')])
-            safe_neighbors = [n for n in neighboring_chains if self.state['chains'][n[:-2] if n.endswith('2x') else n] >= 11]
-            if len(safe_neighbors) >= 2:
-                print("{} is permanently unplayable".format(tile))
-                player['unplayable_tiles'].append(tile)
-
-            # temporarily unplayable tiles would create chain when none available
-            if active_chain_count == len(self.state['chains']):
-                # if this tile is adjacent to island but not chain
-                if 'island' in neighbors and not neighboring_chains:
-                    print("{} is temporarily unplayable".format(tile))
-                    player['temp_unplayable_tiles'].append(tile)
-
+        update_unplayable_tiles(self.state)
 
     def prepare_merger(self, state):
         """Modify state to start mergering.
@@ -435,15 +412,25 @@ class PlayTileAction(TurnAction):
             if state['hotels'][self.tile] == 'island':
                 if any([c for c in state['chains'] if state['chains'][c[:-2] if c.endswith('2x') else c] == 0]):
                     # if there are available chains
+                    state['hotels'][self.tile] = 'island2x'
                     state['state']['state'] = 'declare_chain'
                     update_unplayable_tiles(state)
                 else:
-                    raise ActionForbiddenException("No available chains")
+                    if len(self.player['temp_unplayable_tiles']) == len(self.player['tiles']) + 1:
+                        # this code is copied below, bad bad bad
+                        # ALL TILES MAKE CHAIN BUT NONE AVAILABLE
+                        print("Gotta discard this because all unplayabel")
+                        draw_tile_for_player(self.state, self.player)
+                        state['supply']['tiles'].append(self.tile)
+                        random.shuffle(state['supply']['tiles'])
+                        state['history'].append(['discard_temporarily_unplayable_tile', self.player['username'], self.tile])
+                        history_added = True
+                    else:
+                        raise ActionForbiddenException("No available chains")
             else:
                 state['chains'][state['hotels'][self.tile]] += 1
+                state['hotels'][self.tile] = '{}2x'.format(state['hotels'][self.tile])
                 self.advance_to_buy_or_next()
-            
-            state['hotels'][self.tile] = '{}2x'.format(state['hotels'][self.tile])
         else:
             # NOT a variant
             # Prep for computations by getting active cell's neighbors
@@ -464,6 +451,7 @@ class PlayTileAction(TurnAction):
                     # Because tile is already removed from hand, temp unplayable
                     # Will be one greater than current hand if all are temp unplayable
                     if len(self.player['temp_unplayable_tiles']) == len(self.player['tiles']) + 1:
+                        # this same code is a copy of above, bad bad bad
                         # ALL TILES MAKE CHAIN BUT NONE AVAILABLE
                         print("Gotta discard this because all unplayabel")
                         draw_tile_for_player(self.state, self.player)
@@ -490,7 +478,7 @@ class PlayTileAction(TurnAction):
                     safe_neighbors = [n for n in neighboring_chains if state['chains'][n[:-2] if n.endswith('2x') else n] >= 11]
                     if len(safe_neighbors) >= 2:
                         # just draw a new tile
-                        state['history'].append(['discard_unplayable_tile', self.tile])
+                        state['history'].append(['discard_unplayable_tile', self.player['username'], self.tile])
                         history_added = True
                         draw_tile_for_player(self.state, self.player)
                     else:
@@ -948,6 +936,14 @@ def update_unplayable_tiles(state):
                 if 'island' in neighbors and not neighboring_chains:
                     player['temp_unplayable_tiles'].append(tile)
 
+                if (
+                    'double_tiles_variant' in state['variants'] and 
+                    len([n for n in neighbors if n is not None]) == 0 and 
+                    tile in state['hotels'] and 
+                    state['hotels'][tile] == 'island'
+                ):
+                    player['temp_unplayable_tiles'].append(tile)
+
 
 def pluck_player(state, username):
     return [p for p in state['players'] if p['username'] == username][0]
@@ -1010,7 +1006,7 @@ def pay_bonuses(state):
     if len(state['players']) == 2 and not 'no_2player_tile_draw_variant' in state['variants']:
         tile = state['supply']['tiles'][random.randint(0, len(state['supply']['tiles']))]
         stock_holders.append({
-            'username': None,
+            'username': 'tile_draw',
             'stocks': {
                 defunct_chain: int(tile[1:])
             },
@@ -1031,7 +1027,7 @@ def pay_bonuses(state):
         # if there is only one stock holder, they get both bonuses
         bonus = majority_bonus + minority_bonus
         stock_holders[0]['cash'] += bonus
-        state['history'].append(['both_bonus', bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
+        state['history'].append(['both_bonus', defunct_chain, bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
     else:
         equal_to_first = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[0]['stocks'][defunct_chain]]
         if len(equal_to_first) != 1:
@@ -1042,10 +1038,10 @@ def pay_bonuses(state):
             for p in equal_to_first:
                 p['cash'] += bonus
 
-            state['history'].append(['majority_bonus', bonus] + [p['username'] for p in equal_to_first] + [stock_holders[0]['stocks'][defunct_chain]])
+            state['history'].append(['majority_bonus', defunct_chain, bonus] + [p['username'] for p in equal_to_first] + [stock_holders[0]['stocks'][defunct_chain]])
         else:
             stock_holders[0]['cash'] += majority_bonus
-            state['history'].append(['majority_bonus', majority_bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
+            state['history'].append(['majority_bonus', defunct_chain, majority_bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
 
             equal_to_second = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[1]['stocks'][defunct_chain]]
             if len(equal_to_second) != 1:
@@ -1055,10 +1051,10 @@ def pay_bonuses(state):
                 for p in equal_to_second:
                     p['cash'] += bonus
 
-                state['history'].append(['minority_bonus', bonus] + [p['username'] for p in equal_to_second] + [stock_holders[1]['stocks'][defunct_chain]])
+                state['history'].append(['minority_bonus', defunct_chain, bonus] + [p['username'] for p in equal_to_second] + [stock_holders[1]['stocks'][defunct_chain]])
             else:
                 stock_holders[1]['cash'] += minority_bonus
-                state['history'].append(['minority_bonus', minority_bonus, stock_holders[1]['username'], stock_holders[1]['stocks'][defunct_chain]])
+                state['history'].append(['minority_bonus', defunct_chain, minority_bonus, stock_holders[1]['username'], stock_holders[1]['stocks'][defunct_chain]])
 
 
 def dispose_loser_stock(request):

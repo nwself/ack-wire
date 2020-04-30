@@ -87,12 +87,6 @@ td.in-hand {
   background-color: #7BAFD466;
 }
 
-td.unplayable {
-  border: solid 1px black;
-  cursor: pointer;
-  background-color: lightgray;
-}
-
 span.Tower,
 td.Tower {
   background-color: #ffdc62;
@@ -175,7 +169,7 @@ td.Imperial.in-hand {
 }
 
 td.in-hand2x {
-  background-color: white;
+  background-color: #7BAFD4CC;
   color: black;
   box-shadow: inset 0px 0px 0px 4px black;
   cursor: pointer;
@@ -190,6 +184,12 @@ td.island2x {
   background-color: white;
   color: black;
   box-shadow: inset 0px 0px 0px 4px black;
+}
+
+td.unplayable {
+  border: solid 1px black;
+  cursor: pointer;
+  background-color: lightgray;
 }
 
 /* test unplayable in-hand island http://ack-wire.herokuapp.com/admin/game/gamestate/2935/change/ */

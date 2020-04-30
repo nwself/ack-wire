@@ -291,13 +291,15 @@ var fsm = new machina.Fsm({
         },
         'end_game': {
             _onEnter: function () {
-                var instruction = "Game over."
+                var instruction = "Game over!<p></p><table><tbody>"
                 fsm.acquire.players.sort(function (a, b) {
                     return b.cash - a.cash;
                 })
-                fsm.acquire.players.forEach(function (player) {
-                    instruction += " " + player.username + ": $" + player.cash;
+                fsm.acquire.players.forEach(function (player, i) {
+                    instruction += "<tr><td>" + (i+1) + ".</td><td>" + 
+                        player.username + "</td><td>$" + numberWithCommas(player.cash) + "</td></tr>";
                 });
+                instruction += "</tbody></table";
                 app.instruction = instruction;
             }
         },
@@ -363,8 +365,9 @@ var fsm = new machina.Fsm({
                 if (app.player && 
                         (app.player.temp_unplayable_tiles && app.player.temp_unplayable_tiles.indexOf(coordinates) != -1)) {
                         // app.player.unplayable_tiles && app.player.unplayable_tiles.indexOf(coordinates) != -1)) {
-                    if (chain == 'in-hand') {
-                        chain = 'unplayable';
+
+                    if (chain.includes('in-hand')) {
+                        chain += ' unplayable';
                     }
                     if (chain == 'in-hand2x') {
                         chain = 'unplayable2x';
@@ -458,16 +461,21 @@ var fsm = new machina.Fsm({
             return hotels;
         });
 
-        ranges.push(ranges[ranges.length - 1]);
-        ranges.push(ranges[ranges.length - 1]);
+        ranges.push({
+            cost: ranges[ranges.length - 1].cost + 100,
+        });
+        ranges.push({
+            cost: ranges[ranges.length - 1].cost + 100,
+        });
+
         app.schedule = ranges.map(function (range, i) {
             return [
                 (i < hotels.length ? hotels[i] : "-"),
                 (i - 1 > 0 && i - 1 < hotels.length ? hotels[i - 1] : "-"),
                 (i - 2 > 0 ? hotels[i - 2] : "-"),
                 '$' + numberWithCommas(range.cost),
-                '$' + numberWithCommas(range.cost * 100),
-                '$' + numberWithCommas(range.cost * 50)
+                '$' + numberWithCommas(range.cost * 10),
+                '$' + numberWithCommas(range.cost * 5)
             ];
         })
 
@@ -668,6 +676,11 @@ rivets.formatters.stocksLength = function(value)
 rivets.formatters.firstName = function(value)
 {
   return value && value.length > 0 ? value[0].name : '';
+};
+
+rivets.formatters.comma = function(value)
+{
+  return value ? numberWithCommas(value) : value;
 };
 
 document.addEventListener("DOMContentLoaded", function() {
