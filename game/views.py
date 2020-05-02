@@ -52,7 +52,7 @@ class CreateGame(LoginRequiredMixin, CreateView):
         return response
 
 
-@login_required
+# @login_required
 def game(request, game_pk):
     game = get_object_or_404(Game, pk=game_pk)
     state = game.get_active_state()

@@ -46,7 +46,7 @@ td.inactive {
 }
 
 .isme {
-  background-color: #7BAFD466;
+  background-color: #7BAFD433;
 }
 
 table {
@@ -56,6 +56,7 @@ table {
 #board td {
   text-align: center;
   user-select: none;
+  position: relative;
 }
 
 #shop button.btn:disabled {
@@ -196,6 +197,22 @@ td.unplayable {
 td.in-hand.island {
   color: black;
   box-shadow: inset 0px 0px 0px 4px black;
+}
+
+td.active:after {
+  content: '';
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  position: absolute;
+  background: repeating-linear-gradient(
+    45deg,
+    #ffffff00,
+    #ffffff00 5px,
+    white 5px,
+    white 6px
+  );
 }
 
 #history {

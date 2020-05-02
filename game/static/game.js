@@ -47,6 +47,19 @@ function array_move(arr, old_index, new_index) {
     return arr; // for testing
 };
 
+function addSpan(chain) {
+    return '<span class="swatch ' + chain + '">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> ' + chain;
+}
+
+function mergingText(permutationSet) {
+    return permutationSet.slice(1).reverse().reduce(function (prev, curr, i) {
+        if (i == 0) {
+            return  prev + " takes over " + addSpan(curr);
+        }
+        return prev + " then " + addSpan(curr);
+    }, addSpan(permutationSet[0]));
+}
+
 var stockCosts = [200, 200, 200, 300, 400, 500, 600, 600, 600, 600, 600, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 1000];
 
 var app = {
@@ -60,6 +73,10 @@ var app = {
     gameEnded: false,
     showEndGame: false,
     stockDisposer: new StockDisposer({merging_chains: ["Luxor"]}), // need a dummy because rivets parses the whole thing on startup
+    chosenWinner: null,
+    variants: false,
+    merging: false,
+    mergingHtml: '',
     play_tile: function () {
         console.log(arguments);
     },
@@ -239,43 +256,70 @@ var fsm = new machina.Fsm({
                 app.instruction = "Determine winner of merger."
 
                 app.showDetermineWinner = true;
-                app.mergingChains = fsm.acquire.merging_chains.map(function (chainName, i) {
-                    return {
-                        order: i + 1,
-                        name: chainName,
-                        size: fsm.acquire.chains[chainName],
-                        canUp: function (chain) {
-                            var index = chain.order - 1;
-                            return index != 0 && app.mergingChains[index].size >= app.mergingChains[index-1].size;
-                        },
-                        up: function (event, model) {
-                            var index = model.chain.order - 1;
-                            var newChains = app.mergingChains.slice();
-                            array_move(newChains, index, index - 1);
-                            newChains[index].order++;
-                            newChains[index - 1].order--;
-                            app.mergingChains = newChains; 
-                        },
-                        canDown: function (chain) {
-                            var index = chain.order - 1;
-                            return index != app.mergingChains.length-1 && app.mergingChains[index].size <= app.mergingChains[index+1].size;
-                        },
-                        down: function (event, model) {
-                            var index = model.chain.order - 1;
-                            var newChains = app.mergingChains.slice();
-                            array_move(newChains, index, index + 1);
-                            newChains[index].order--;
-                            newChains[index + 1].order++;
-                            app.mergingChains = newChains;
+
+                // group merging_chains by size
+                var groups = fsm.acquire.merging_chains.reduce(function (prev, chainName) {
+                    var size = fsm.acquire.chains[chainName];
+                    if (size in prev) {
+                        prev[size].push(chainName);
+                    } else {
+                        prev[size] = [chainName];
+                    }
+                    return prev;
+                }, {});
+
+                // compute each iteration of size
+                var iterations = Object.keys(groups).sort(function (a, b) {
+                    return b - a;
+                }).map(function (size) {
+                    return permutator(groups[size]);
+                });
+
+                function combinePermutations(permutationSets) {
+                    if (permutationSets.length == 1) {
+                        return permutationSets[0];
+                    }
+                    var biggestSet = permutationSets[0];
+                    var smallerSets = combinePermutations(permutationSets.slice(1));
+
+                    // for list in permute[A I]:
+                    //   for inner in permute[T L]:
+                    //     yield list.concat(inner)
+
+                    var output = [];
+                    for (var i = 0; i < biggestSet.length; i++) {
+                        for (var j = 0; j < smallerSets.length; j++) {
+                            output.push(biggestSet[i].concat(smallerSets[j]));
                         }
+                    }
+                    return output;
+                }
+
+                // var buttons = combinePermutations([
+                //     permutator(["I", "A"]), 
+                //     permutator(["C"]),
+                //     // permutator(["T", "I", "L", "C"]),
+                // ]);
+                var buttons = combinePermutations(iterations);
+                app.mergingChains = buttons.map(function (permutationSet, i) {
+                    return {
+                        text: mergingText(permutationSet),
+                        value: i,
+                        id: "merging-id-" + i,
+                        order: permutationSet
                     }
                 });
             },
 
             'determine_winner': function () {
-                var winnerOrder = app.mergingChains.map(function (chain) {
-                    return chain.name;
-                });
+                // var winnerOrder = app.mergingChains.map(function (chain) {
+                //     return chain.name;
+                // });
+                if (app.chosenWinner == null) {
+                    console.error("determine_winner but no chosenWinner")
+                    return;
+                }
+                var winnerOrder = app.mergingChains[app.chosenWinner].order;
                 console.log("Here in fsm determining winner", winnerOrder);
                 chatSocket.send(JSON.stringify({
                     action: 'determine_winner',
@@ -287,6 +331,7 @@ var fsm = new machina.Fsm({
 
             _onExit: function () {
                 app.showDetermineWinner = false;
+                app.chosenWinner = null;
             }
         },
         'end_game': {
@@ -369,10 +414,12 @@ var fsm = new machina.Fsm({
                     if (chain.includes('in-hand')) {
                         chain += ' unplayable';
                     }
-                    if (chain == 'in-hand2x') {
+                    if (chain.includes('in-hand2x')) {
                         chain = 'unplayable2x';
                     }
                 }
+
+                var active = coordinates == acquire.active_cell;
 
                 if (chain && (chain in acquire.chains)) {
                     coordinates = chain[0];
@@ -380,10 +427,10 @@ var fsm = new machina.Fsm({
                 if (chain && (chain.slice(0, -2) in acquire.chains)) {
                     coordinates = chain[0] + "<sub>2</sub>";
                 }
-                // sub 2 not worknig here http://ack-wire.herokuapp.com/admin/game/gamestate/3090/change/
+
                 row.push(new Cell({
                     coordinates: coordinates,
-                    chain: chain,
+                    chain: active ? chain + ' active' : chain,
                 }));
             }
             app.board.push(row);
@@ -413,7 +460,14 @@ var fsm = new machina.Fsm({
             });
         });
 
-        app.history = acquire.history.reverse();
+        app.merging = acquire.merging_chains.length > 0 && acquire.state.state != "determine_winner";
+        if (app.merging) {
+            app.mergingHtml = mergingText(acquire.merging_chains);
+        }
+
+        app.history = acquire.history.reverse().concat(acquire.variants.map(function (variant) {
+            return "VARIANT: " + variant;
+        }));
 
         if (app.player && (acquire.state.player == username || acquire.state.player == '')) {
             app.myturn = true;
@@ -477,7 +531,7 @@ var fsm = new machina.Fsm({
                 '$' + numberWithCommas(range.cost * 10),
                 '$' + numberWithCommas(range.cost * 5)
             ];
-        })
+        });
 
         fsm.checkForEnd(acquire.chains);
     },
@@ -535,6 +589,9 @@ function Player(obj) {
     this.stocks = obj.stocks;
     this.cash = obj.cash;
     this.isme = (app.player ? app.player.username == this.name : false);
+    this.isturn = (fsm.acquire.merging_chains.length == 0) ?
+        fsm.acquire.state.player == this.name :
+        fsm.acquire.merging_player == this.name;
 }
 
 function Cell(obj) {
@@ -584,7 +641,6 @@ function Stock(obj) {
 }
 
 Stock.prototype.getCost = function (event, model) {
-    console.log("Getting chain cost from model", model);
     return app.lookupChainCost(this.name);
 }
 
@@ -623,7 +679,7 @@ function StockDisposer(state) {
 }
 
 StockDisposer.prototype.tradeIncome = function () {
-    return this.disposeCart.trade / 2 + " " + this.state.merging_chains[0];
+    return this.disposeCart.trade / 2;
 }
 StockDisposer.prototype.sellIncome = function () {
     return this.disposeCart.sell * app.lookupChainCost(this.defunctChain);
@@ -690,6 +746,28 @@ document.addEventListener("DOMContentLoaded", function() {
 function numberWithCommas(x) {
     return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
+
+function permutator(inputArr) {
+  var results = [];
+
+  function permute(arr, memo) {
+    var cur, memo = memo || [];
+
+    for (var i = 0; i < arr.length; i++) {
+      cur = arr.splice(i, 1);
+      if (arr.length === 0) {
+        results.push(memo.concat(cur));
+      }
+      permute(arr.slice(), memo.concat(cur));
+      arr.splice(i, 0, cur[0]);
+    }
+
+    return results;
+  }
+
+  return permute(inputArr);
+}
+
 
 
 // // represents the stata and is synced with/bound to the HTML rivets template
