@@ -472,6 +472,9 @@ var fsm = new machina.Fsm({
         if (app.player && (acquire.state.player == username || acquire.state.player == '')) {
             app.myturn = true;
             this.transition(acquire.state.state);
+        } else if (acquire.state.state == "end_game") {
+            app.instruction = "End game";
+            this.transition(acquire.state.state);
         } else {
             this.transition("waiting");
             app.instruction = "Waiting for " + acquire.state.player + " to " + acquire.state.state;
