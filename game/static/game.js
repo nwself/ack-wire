@@ -460,7 +460,7 @@ var fsm = new machina.Fsm({
             });
         });
 
-        app.merging = acquire.merging_chains.length > 0 && acquire.state.state != "determine_winner";
+        app.merging = acquire.merging_chains.length > 0 && acquire.state.state != "determine_winner" && acquire.state.state != "end_game";
         if (app.merging) {
             app.mergingHtml = mergingText(acquire.merging_chains);
         }
