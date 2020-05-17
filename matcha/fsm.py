@@ -83,17 +83,18 @@ class Player:
         self.name = data['name']
         self.hand = data['hand'] if 'hand' in data else []
         self.tableau = data['tableau'] if 'tableau' in data else []
-        # self.foreplace = data['foreplace'] if 'foreplace' in data else []
+        self.foreplace = data['foreplace'] if 'foreplace' in data else []
         self.turn_order = turn_order
 
     def set_hand(self, hand):
         self.hand = hand
 
-    # def play_foreplace(self, card):
-    #     self._play_card(card, 'foreplace')
+    def play_foreplace(self, card):
+        if card not in self.hand:
+            raise CardNotInHand(card)
 
-    def play_card(self, card):
-        self._play_card(card, 'hand')
+        self.hand.remove(card)
+        self.foreplace.append(card)
 
     def play_card(self, card):
         if card not in self.hand:
@@ -110,7 +111,7 @@ class Player:
             'name': self.name,
             'hand': [c.to_data() for c in self.hand],
             'tableau': [c.to_data() for c in self.tableau],
-            # 'foreplace': [c.to_data() for c in self.foreplace],
+            'foreplace': [c.to_data() for c in self.foreplace],
         }
 
     def __repr__(self):
@@ -155,7 +156,7 @@ class BaseMatchaGame:
         self.players[0].set_hand(self.deck[:10])
         self.players[1].set_hand(self.deck[10:])
 
-        self.state = State(self.players[0], 'lead')
+        self.state = State(self.players[0], self.initial_state)
 
     def lead(self, card_data):
         card = Card.from_data(card_data)
@@ -171,14 +172,21 @@ class BaseMatchaGame:
             raise CardNotPlayable(card)
 
         # TODO transition to "draw" game end if no cards left in other player's hand
-        self.transition(
-            'lead',
-            next_player=self.current_player().last_played() <= self.next_player().last_played()
-        )
+        # If next_player's hand is empty
+        if not self.next_player().hand:
+            self.transition('game_end', next_player=False)
+        else:
+            self.transition(
+                'lead',
+                next_player=self.current_player().last_played() <= self.next_player().last_played()
+            )
 
-    # def foreplace(self, card_data):
-    #     card = Card.from_data(card_data)
-    #     self.current_player().play_foreplace(card)
+    def foreplace(self, card_data):
+        card = Card.from_data(card_data)
+        self.current_player().play_foreplace(card)
+
+        next_state = 'foreplace' if self.current_player().turn_order == 0 else 'lead'
+        self.transition(next_state, next_player=True)
 
     def valid_follow(self, card):
         # follow is valid if it matches suit, or if it matches number and there are no suit matches
@@ -211,6 +219,8 @@ class BaseMatchaGame:
 
 
 class DoubleMatchaState(BaseMatchaGame):
+    initial_state = 'foreplace'
+
     deck = [
         (Card.Suit.CLUBS, Card.Rank.ACE),
         (Card.Suit.CLUBS, Card.Rank.TEN),
@@ -239,6 +249,8 @@ class DoubleMatchaState(BaseMatchaGame):
 
 
 class MatchaState(BaseMatchaGame):
+    initial_state = 'foreplace'
+
     deck = [
         (Card.Suit.CLUBS, Card.Rank.ACE),
         (Card.Suit.CLUBS, Card.Rank.TEN),

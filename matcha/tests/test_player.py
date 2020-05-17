@@ -60,3 +60,6 @@ def test_to_data(player: Player):
 
     assert('tableau' in data)
     assert(len(data['tableau']) == len(player.tableau))
+
+    assert('foreplace' in data)
+    assert(len(data['foreplace']) == len(player.foreplace))

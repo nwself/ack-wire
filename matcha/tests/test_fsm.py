@@ -153,3 +153,28 @@ def test_follow_same_card(state: DoubleMatchaState):
 
     assert(state.state.state_name == 'lead')
     assert(state.state.player == leading_player)
+
+
+def test_foreplace(state: DoubleMatchaState):
+    state.foreplace(state.current_player().hand[0].to_data())
+
+    assert(state.state.state_name == 'foreplace')
+    assert(state.state.player == state.players[1])
+
+    state.foreplace(state.current_player().hand[0].to_data())
+
+    assert(state.state.state_name == 'lead')
+    assert(state.state.player == state.players[0])
+
+
+def test_end_game(state: DoubleMatchaState):
+    lead_card = Card(Card.Suit.CLUBS, Card.Rank.KING)
+    follow_card = Card(Card.Suit.HEARTS, Card.Rank.KING)
+
+    state.current_player().hand = [lead_card]
+    state.next_player().hand = [follow_card]
+
+    state.lead(lead_card.to_data())
+    state.follow(follow_card.to_data())
+
+    assert(state.state.state_name == 'game_end')
