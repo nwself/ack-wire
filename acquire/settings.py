@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'crispy_forms',
     'django_select2',
     'game',
+    'matcha',
 ]
 
 MIDDLEWARE = [
