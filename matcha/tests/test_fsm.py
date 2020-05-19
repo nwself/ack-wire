@@ -26,6 +26,37 @@ def test_initialize():
     assert len(state.players[1].hand) == 10
 
 
+def test_from_data():
+    data = {
+        'players': [{
+            'name': 'piestastedgood',
+            'hand': [
+                {'suit': 3, 'rank': 3}
+            ]
+
+        }, {
+            'name': 'tripswithtires',
+            'hand': [
+                {'suit': 1, 'rank': 11}
+            ]
+        }],
+        'state': {
+            'player': 'tripswithtires',
+            'state': 'foreplace',
+            'game_id': 0
+        }
+    }
+    state = DoubleMatchaState.from_data(data)
+
+    assert(len(state.players) == 2)
+    assert(state.state.player.name == 'tripswithtires')
+    assert(state.state.state_name == data['state']['state'])
+    assert(state.state.game_id == data['state']['game_id'])
+
+    assert(len(state.players[0].hand) == len(data['players'][0]['hand']))
+    assert(type(state.players[0].hand[0]) == Card)
+
+
 def test_to_data(state: DoubleMatchaState):
     data = state.to_data()
 
@@ -171,6 +202,8 @@ def test_end_game(state: DoubleMatchaState):
     lead_card = Card(Card.Suit.CLUBS, Card.Rank.KING)
     follow_card = Card(Card.Suit.HEARTS, Card.Rank.KING)
 
+    second_player = state.next_player()
+
     state.current_player().hand = [lead_card]
     state.next_player().hand = [follow_card]
 
@@ -178,3 +211,6 @@ def test_end_game(state: DoubleMatchaState):
     state.follow(follow_card.to_data())
 
     assert(state.state.state_name == 'game_end')
+    assert(state.current_player() == second_player)
+    assert(state.current_player().hand == [lead_card])
+    assert(state.next_player().hand == [follow_card])

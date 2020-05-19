@@ -90,6 +90,8 @@ class Player:
         self.hand = hand
 
     def play_foreplace(self, card):
+        print(card)
+        print(self.hand)
         if card not in self.hand:
             raise CardNotInHand(card)
 
@@ -122,14 +124,20 @@ class Player:
 
 
 class State:
-    def __init__(self, player, state_name):
+    def __init__(self, player, state_name, game_id):
         self.player = player
         self.state_name = state_name
+        self.game_id = 0
+
+    @staticmethod
+    def from_data(data):
+        return State(data['player'], data['state'], data['game_id'])
 
     def to_data(self):
         return {
             "player": self.player.name,
-            "state": self.state_name
+            "state": self.state_name,
+            "game_id": self.game_id,
         }
 
     def set_player(self, player):
@@ -149,6 +157,7 @@ class BaseMatchaGame:
     def __init__(self, data):
         self.players = [Player(p, i) for i, p in enumerate(data['players'])]
 
+
     def initialize(self):
         self.deck = [Card(s, r) for s, r in self.deck]
         random.shuffle(self.deck)
@@ -156,7 +165,7 @@ class BaseMatchaGame:
         self.players[0].set_hand(self.deck[:10])
         self.players[1].set_hand(self.deck[10:])
 
-        self.state = State(self.players[0], self.initial_state)
+        self.state = State(self.players[0], self.initial_state, game_id=0)
 
     def lead(self, card_data):
         card = Card.from_data(card_data)
@@ -174,7 +183,8 @@ class BaseMatchaGame:
         # TODO transition to "draw" game end if no cards left in other player's hand
         # If next_player's hand is empty
         if not self.next_player().hand:
-            self.transition('game_end', next_player=False)
+            # this is a draw, no score?
+            self.end_game()
         else:
             self.transition(
                 'lead',
@@ -196,6 +206,18 @@ class BaseMatchaGame:
             not any([c.suit == lead_card.suit for c in self.current_player().hand]) and card.rank == lead_card.rank
         )
 
+    def end_game(self):
+        next_state = 'game_end' if self.state.game_id == 0 else 'match_end'
+
+        first_hand = self.players[0].hand + self.players[0].foreplace + self.players[0].tableau
+        second_hand = self.players[1].hand + self.players[1].foreplace + self.players[1].tableau
+
+        self.players[0].hand = second_hand
+        self.players[1].hand = first_hand
+
+        self.state.game_id += 1
+        self.transition(next_state, player=self.players[1])
+
     def declare_matcha(self):
         """Called when state.player cannot follow lead."""
         pass
@@ -206,10 +228,23 @@ class BaseMatchaGame:
     def next_player(self):
         return self.players[(self.state.player.turn_order + 1) % len(self.players)]
 
-    def transition(self, state, next_player=False):
+    def transition(self, state, next_player=False, player=None):
         if next_player:
             self.state.set_player(self.next_player())
+
+        if player is not None:
+            self.state.set_player(player)
+
         self.state.set_state_name(state)
+
+    @staticmethod
+    def from_data(data):
+        for player in data['players']:
+            player['hand'] = [Card.from_data(c) for c in player['hand']]
+        state = MatchaState(data)
+        data['state']['player'] = [p for p in state.players if p.name == data['state']['player']][0]
+        state.state = State.from_data(data['state'])
+        return state
 
     def to_data(self):
         return {

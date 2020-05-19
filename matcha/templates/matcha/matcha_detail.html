@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title_block %}
+  Matcha - {{ object.name }}
+{% endblock title_block %}
+
+{% block head %}
+  <script src="{% static "vendor/js/websocket.min.js" %}"></script>
+  <script src="{% static "vendor/js/lodash.min.js" %}"></script>
+  <script src="{% static "vendor/js/machina.js" %}"></script>
+  <script src="{% static "vendor/js/sightglass.js" %}"></script>
+  <script src="{% static "vendor/js/rivets.full.js" %}"></script>
+
+  <link rel="stylesheet" href="{% static "matcha/matcha.css" %}">
+{% endblock head %}
+
+{% block content %}
+  
+  <div class="banner">
+    { app.instruction }
+  </div>
+
+  <div class="board">
+    
+  </div>
+
+  <div class="hand">
+    <div rv-each-card="app.hand" rv-class="card.class" rv-on-click="card.play">{ card|card }</div>
+  </div>
+
+{% endblock content %}
+
+{% block extra_body %}
+  {{ game_state|json_script:"initial-state" }}
+
+  <script type="text/javascript">
+    // var roomName = {{ game_name_json }};
+    // var username = "{{ user.username }}";
+  </script>
+
+  <script src="{% static "matcha/matcha.js" %}"></script>
+{% endblock extra_body %}

@@ -8,6 +8,7 @@ def player():
         'name': 'piestastedgood',
         'hand': [Card(Card.Suit.CLUBS, Card.Rank.ACE)],
         'tableau': [Card(Card.Suit.CLUBS, Card.Rank.TEN)],
+        'foreplace': [Card(Card.Suit.CLUBS, Card.Rank.KING)],
     }, 0)
 
 
@@ -19,9 +20,9 @@ def test_init():
         'tableau': [Card(Card.Suit.CLUBS, Card.Rank.TEN)],
     }, 0)
     
-    assert player.name == player_name
-    assert len(player.hand) == 1
-    assert len(player.tableau) == 1
+    assert(player.name == player_name)
+    assert(len(player.hand) == 1)
+    assert(len(player.tableau) == 1)
 
 
 def test_play_card(player: Player):

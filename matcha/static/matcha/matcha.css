@@ -1,0 +1,51 @@
+body {
+  background: #fffff0;
+}
+
+/***************************
+ * banner
+ **************************/
+
+.banner {
+  background-color: white;
+  text-align: center;
+  padding: .5rem 0;
+  border-top: solid 5px #cbd17d;
+  border-bottom: solid 5px #cbd17d;
+}
+
+/***************************
+ * board
+ **************************/
+
+.board {
+  display: grid;
+  grid-template-columns: 1fr 4fr 1fr 4fr 1fr;
+  grid-gap: 1rem;
+}
+
+/***************************
+ * hand
+ **************************/
+
+.hand {
+  display: flex;
+  justify-content: space-around;
+}
+
+.playing-card {
+  border-radius: 1rem;
+  border: solid 2px black;
+  padding: 1.5rem 2rem;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.playing-card:hover {
+  background-color: #ffffc0
+}
+
+.hearts,
+.diamonds {
+  color: red;
+}
