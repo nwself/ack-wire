@@ -13,7 +13,7 @@ var chatSocket = new ReconnectingWebSocket(websocketURL);
 
 chatSocket.addEventListener('message', function(e) {
     var data = JSON.parse(e.data);
-    console.log(data);
+    console.log("MESSAGE", data);
 
     if ("status" in data) {
         console.log("Possibly something has gone wrong");
@@ -45,7 +45,19 @@ chatSocket.addEventListener('close', function(e) {
 });
 
 /***************************
- * Card class
+ * EmptyCard class
+ **************************/
+
+function EmptyCard() {
+  this.class = "playing-card empty";
+}
+
+EmptyCard.prototype.toString = function () {
+  return " ";
+}
+
+/***************************
+ * EmptyCard class
  **************************/
 
 function Card(obj) {
@@ -113,11 +125,34 @@ Card.prototype.play = function (event, model) {
 }
 
 /***************************
+ * Player
+ **************************/
+
+function Player(data) {
+  this.name = data.name;
+  this.foreplace = data.foreplace.length > 0 ? new Card(data.foreplace[0]) : new EmptyCard();
+  this.tableau = _.range(10).map(function (i) {
+    return i < data.tableau.length ? new Card(data.tableau[i]) : new EmptyCard();
+  });
+  this.score = data.score;
+}
+
+Player.prototype.isMe = function () {
+  return this.name == fsm.matcha.me;
+}
+
+/***************************
  * rivetsjs app
  **************************/
 
 var app = {
   hand: [],
+  skipForeplace: function () {
+    fsm.handle("skip_foreplace");
+  },
+  nextGame: function () {
+    fsm.handle("next_game");
+  }
 };
 
 /***************************
@@ -141,21 +176,37 @@ var fsm = new machina.Fsm({
 
         var me = this.pluckPlayer(initialState.me);
         // load hand
-        app.hand = me.hand.map(function (card) {
+        me.hand = me.hand.map(function (card) {
           return new Card(card);
         }).sort(Card.prototype.sort);
 
-        if (this.matcha.state.player == this.matcha.me) {
+        app.hand = _.range(10).map(function (i) {
+          return i < me.hand.length ? new Card(me.hand[i]) : new EmptyCard();
+        });
+
+        this.matcha.players.forEach(function (data) {
+          var player = new Player(data);
+          if (player.isMe()) {
+            app.me = player;
+          } else {
+            app.opponent = player;
+          }
+        });
+
+        if (this.matcha.state.player == this.matcha.me || this.matcha.state.state == 'matcha') {
           this.transition(this.matcha.state.state);
         } else {
           this.transition('waiting');
         }
+
+        app.gameNumber = this.matcha.state.game_id + 1;
       }
     },
 
     foreplace: {
       _onEnter: function () {
-        app.instruction = "Choose a card to foreplace or skip."
+        app.instruction = "Choose a card to foreplace or skip.";
+        app.showSkipForeplace = true;
       },
       play_card: function (card) {
         console.log("Tell server to foreplace ", card);
@@ -163,6 +214,73 @@ var fsm = new machina.Fsm({
             action: 'foreplace',
             body: card.toData()
         }));
+      },
+      skip_foreplace: function (card) {
+        console.log("Tell server to skip foreplace");
+        chatSocket.send(JSON.stringify({
+            action: 'skip_foreplace',
+            body: {}
+        }));
+      },
+      _onExit: function () {
+        app.instruction = '';
+        app.showSkipForeplace = false;
+      }
+    },
+
+    lead: {
+      _onEnter: function () {
+        app.instruction = 'Lead a card.';
+      },
+
+      play_card: function (card) {
+        console.log("Tell server to lead ", card);
+        chatSocket.send(JSON.stringify({
+            action: 'lead',
+            body: card.toData()
+        }));
+
+      },
+
+      _onExit: function () {
+        app.instruction = '';
+      }
+    },
+
+    follow: {
+      _onEnter: function () {
+        app.instruction = "Follow your opponent's card.";
+      },
+
+      play_card: function (card) {
+        console.log("Tell server to follow with ", card);
+        chatSocket.send(JSON.stringify({
+            action: 'follow',
+            body: card.toData()
+        }));
+      },
+
+      _onExit: function () {
+        app.instruction = '';
+      }
+    },
+
+    matcha: {
+      _onEnter: function () {
+        app.instruction = "It's a matcha!"
+        app.showNextGame = true;
+      },
+
+      next_game: function () {
+        chatSocket.send(JSON.stringify({
+            action: 'next_game',
+            body: app.me.name
+        }));
+      },
+
+      _onExit: function () {
+        app.instruction = '';
+        app.showNextGame = false;
       }
     },
 
@@ -174,6 +292,9 @@ var fsm = new machina.Fsm({
           " to " +
           this.stateToInstruction(this.matcha.state.state) +
           ".";
+      },
+      _onExit: function () {
+        app.instruction = '';
       }
     },
   },
@@ -206,6 +327,6 @@ document.addEventListener("DOMContentLoaded", function() {
  * rivetsjs formatters
  **************************/
 
-rivets.formatters.card = function(value){
-  return value.toString();
+rivets.formatters.card = function(value) {
+  return value ? value.toString() : value;
 }

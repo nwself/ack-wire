@@ -11,6 +11,9 @@ class MatchaGame(models.Model):
     name = models.SlugField(db_index=True)
     users = models.ManyToManyField(settings.AUTH_USER_MODEL)
 
+    # rollback last turn/delete most recent game state
+    # matcha_game.matchagamestate_set.all().order_by('-effective').first().delete()
+
     def get_absolute_url(self):
         return reverse('matcha:detail', kwargs={'name': self.name})
 
@@ -41,8 +44,8 @@ class MatchaGame(models.Model):
         if not hasattr(state, data['action']):
             raise ActionForbiddenException(f"No such action {data['action']}")
 
-        new_state = getattr(state, data['action'])(data['body'])
-        db_state = self.matchagamestate_set.create(state=json.dumps(new_state.to_data()))
+        getattr(state, data['action'])(data['body'])
+        db_state = self.matchagamestate_set.create(state=json.dumps(state.to_data()))
 
         return [(user.pk, db_state.get_state(for_=user)) for user in self.users.all()]
 
@@ -59,7 +62,7 @@ class MatchaGameState(models.Model):
 
     state = models.TextField()
 
-    def get_state(self, for_):
+    def get_state(self, for_=None):
         state = json.loads(self.state)
 
         if for_ is None:

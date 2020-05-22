@@ -23,11 +23,31 @@
   </div>
 
   <div class="board">
-    
+    <div><small>Game { app.gameNumber }</small></div>
+    <div><p><strong>{ app.opponent.name }</strong> Score: { app.opponent.score }</p></div>
+    <div class="foreplace">
+      <div rv-class="app.opponent.foreplace.class">F { app.opponent.foreplace|card }</div>
+    </div>
+    <div class="tableau">
+      <div rv-each-card="app.opponent.tableau" rv-class="card.class">{ card|card }</div>
+    </div>
+    <div class="tableau">
+      <div rv-each-card="app.me.tableau" rv-class="card.class">{ card|card }</div>
+    </div>
+    <div class="foreplace">
+      <div rv-class="app.me.foreplace.class">F { app.me.foreplace|card }</div>
+    </div>
+    <div><p><strong>{ app.me.name }</strong> Score: { app.me.score }</p></div>
   </div>
 
   <div class="hand">
-    <div rv-each-card="app.hand" rv-class="card.class" rv-on-click="card.play">{ card|card }</div>
+    <div rv-each-card="app.hand" rv-class="card.class" rv-on-click="card.play" rv-hide="card.empty">{ card|card }</div>
+  </div>
+  <div rv-show="app.showSkipForeplace">
+    <button class="btn btn-primary" rv-on-click="app.skipForeplace">Skip</button>
+  </div>
+  <div rv-show="app.showNextGame">
+    <button class="btn btn-primary" rv-on-click="app.nextGame">Next Game</button>
   </div>
 
 {% endblock content %}

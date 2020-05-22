@@ -10,7 +10,7 @@ class MatchaConsumer(JsonWebsocketConsumer):
         self.user = self.scope['user']
         self.room_group_name = '{}-{}'.format(self.game_name, self.user.pk)
 
-        print("group adding {} {}".format(self.room_group_name, self.channel_name))
+        print("adding {} to channel {}".format(self.room_group_name, self.channel_name))
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_name,
             self.channel_name
@@ -31,17 +31,18 @@ class MatchaConsumer(JsonWebsocketConsumer):
         game = MatchaGame.objects.get(name=self.game_name)
         responses = game.process(content, self.user)
 
-        for user, response in responses:
-            if user == self.user.pk:
+        for user_pk, response in responses:
+            if user_pk == self.user.pk:
                 self.send_json(response)
             else:
-                player_room_name = "{}-{}".format(self.game_name, user.pk)
+                player_room_name = "{}-{}".format(self.game_name, user_pk)
 
+                print(f"Send also to {player_room_name}")
                 async_to_sync(self.channel_layer.group_send)(
                     player_room_name,
                     {
                         'type': 'state_message',
-                        'state': state
+                        'state': response
                     }
                 )
 

@@ -19,9 +19,14 @@ body {
  **************************/
 
 .board {
-  display: grid;
+  /*display: grid;
   grid-template-columns: 1fr 4fr 1fr 4fr 1fr;
-  grid-gap: 1rem;
+  grid-gap: 1rem;*/
+}
+
+.tableau {
+  display: flex;
+  justify-content: space-around;
 }
 
 /***************************
@@ -48,4 +53,14 @@ body {
 .hearts,
 .diamonds {
   color: red;
+}
+
+.playing-card {
+  flex: 1 1 0px;
+  margin: 0 .5rem;
+  width: 0;
+}
+
+.playing-card.empty {
+  visibility: hidden;
 }
