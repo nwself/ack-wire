@@ -9,6 +9,24 @@ main {
   display: flex;
 }
 
+.myturn {
+  background-color: #d2dbe166;
+}
+
+#shop button.btn-outline-secondary {
+  color: black;
+}
+
+#shop button.btn-outline-secondary:hover {
+  background-color: #7BAFD466;
+}
+
+#shop button.btn.btn-primary {
+  border: none;
+  background-color: #7BAFD466;
+  color: inherit;
+}
+
 #shop,
 #hand-shop {
   padding-top: 2em;
@@ -28,7 +46,7 @@ td.inactive {
 }
 
 .isme {
-  background-color: #7BAFD466;
+  background-color: #7BAFD433;
 }
 
 table {
@@ -37,6 +55,14 @@ table {
 
 #board td {
   text-align: center;
+  user-select: none;
+  position: relative;
+}
+
+#shop button.btn:disabled {
+  border: none;
+  background-color: inherit;
+  color: inherit;
 }
 
 #supply-chains table tbody td:nth-child(n+3) {
@@ -64,7 +90,7 @@ td.in-hand {
 
 span.Tower,
 td.Tower {
-  background-color: yellow;
+  background-color: #ffdc62;
 }
 
 span.Luxor,
@@ -74,27 +100,119 @@ td.Luxor {
 
 span.American,
 td.American {
-  background-color: blue;
+  background-color: #6b72ab;
   color: white;
 }
 
 span.Festival,
 td.Festival {
-  background-color: green;
+  background-color: #53a25e;
   color: white;
 }
 span.Worldwide,
 td.Worldwide {
-  background-color: brown;
+  background-color: #b58762;
   color: white;
 }
 span.Continental,
 td.Continental {
-  background-color: teal;
+  background-color: #59aec8;
 }
 span.Imperial,
 td.Imperial {
-  background-color: magenta;
+  background-color: #ff596d;
+}
+
+
+span.Tower2x,
+td.Tower2x {
+  background-color: #FCAA2F;
+}
+
+span.Luxor2x,
+td.Luxor2x {
+  background-color: #f58300;
+}
+
+span.American2x,
+td.American2x {
+  background-color: #3d477c;
+  color: white;
+}
+
+span.Festival2x,
+td.Festival2x {
+  background-color: #207333;
+  color: white;
+}
+span.Worldwide2x,
+td.Worldwide2x {
+  background-color: #835A37;
+  color: white;
+}
+span.Continental2x,
+td.Continental2x {
+  background-color: #1B7F97;
+}
+span.Imperial2x,
+td.Imperial2x {
+  background-color: #CB1C42;
+}
+
+td.Tower.in-hand,
+td.Luxor.in-hand,
+td.American.in-hand,
+td.Festival.in-hand,
+td.Worldwide.in-hand,
+td.Continental.in-hand,
+td.Imperial.in-hand {
+  box-shadow: inset 0px 0px 0px 4px black;
+}
+
+td.in-hand2x {
+  background-color: #7BAFD4CC;
+  color: black;
+  box-shadow: inset 0px 0px 0px 4px black;
+  cursor: pointer;
+}
+td.unplayable2x {
+  background-color: lightgray;
+  color: black;
+  cursor: pointer;
+  box-shadow: inset 0px 0px 0px 4px black;
+}
+td.island2x {
+  background-color: white;
+  color: black;
+  box-shadow: inset 0px 0px 0px 4px black;
+}
+
+td.unplayable {
+  border: solid 1px black;
+  cursor: pointer;
+  background-color: lightgray;
+}
+
+/* test unplayable in-hand island http://ack-wire.herokuapp.com/admin/game/gamestate/2935/change/ */
+td.in-hand.island {
+  color: black;
+  box-shadow: inset 0px 0px 0px 4px black;
+}
+
+td.active:after {
+  content: '';
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  position: absolute;
+  background: repeating-linear-gradient(
+    45deg,
+    #ffffff00,
+    #ffffff00 5px,
+    white 5px,
+    white 6px
+  );
 }
 
 #history {

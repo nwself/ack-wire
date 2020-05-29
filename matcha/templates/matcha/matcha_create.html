@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% load crispy_forms_tags %}
+
+{% block title_block %}
+  Matcha - Create Gameo
+{% endblock title_block %}
+
+{% block head %}
+  {{ form.media.css }}
+{% endblock head %}
+
+{% block content %}
+  <h4>Create a new Matcha game</h4>
+
+  <form action="{% url 'matcha:create' %}" method="post">
+    {% csrf_token %}
+    {{ form|crispy }}
+    <input class="btn btn-primary" type="submit" value="Submit">
+  </form>
+  <a href="{% url 'lobby' %}">Back to homepage</a>
+{% endblock content %}
+
+{% block extra_body %}
+  <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+  {{ form.media.js }}
+{% endblock extra_body %}

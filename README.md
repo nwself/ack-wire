@@ -26,3 +26,16 @@ Make yourself a superuser with `./manage.py createsuperuser` then you can go to 
 - Fix declare chain buttons for mobile
   - Possibly change all buttons to some reasonable style & size, esp. stock buying +/-
 - Warn if buying less than 3 stocks and player still has money
+
+### Start game in shell
+
+Create a game in the shell with:
+```python
+from game.views import start_game
+from game.models import Game
+g = Game.objects.create(name='game-name')
+g.users.add(u1)
+g.users.add(u2)
+g.save()
+start_game(game, other_options)
+```

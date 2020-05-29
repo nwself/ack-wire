@@ -15,6 +15,7 @@ from django.utils.safestring import mark_safe
 from django.urls import reverse
 
 from .models import Game, GameState, build_initial_state
+from .forms import GameForm
 
 
 logger = logging.getLogger(__file__)
@@ -22,23 +23,36 @@ logger = logging.getLogger(__file__)
 
 @login_required
 def lobby(request):
+    games = request.user.game_set.all().order_by('-pk')
+
+    groups = {True: [], False: []}  # who knew you could do this?
+    for game in games:
+        groups[game.game_over()].append(game)
+
     return render(request, 'games/lobby.html', {
-        'current_games': request.user.game_set.all()
+        'current_games': groups[False],
+        'finished_games': groups[True]
     })
 
 
 class CreateGame(LoginRequiredMixin, CreateView):
-    model = Game
-    fields = ['name', 'users']
+    # model = Game
+    # fields = ['name', 'users', 'double_tiles_variant', 'no_2player_tile_draw_variant']
+    form_class = GameForm
+    template_name = "game/game_form.html"
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        start_game(form.instance)
+        # This is not the right way to do this, super saves then we save again :/
+        form.instance.users.add(self.request.user)
+        form.instance.save()
+
+        start_game(form.instance, variants=form.instance.get_variants())
         #return redirect(self.get_success_url())
         return response
 
 
-@login_required
+# @login_required
 def game(request, game_pk):
     game = get_object_or_404(Game, pk=game_pk)
     state = game.get_active_state()
@@ -49,6 +63,7 @@ def game(request, game_pk):
     del state['supply']['tiles']
 
     return render(request, 'games/game.html', {
+        'game': game,
         'game_name_json': mark_safe(json.dumps(game_pk)),
         'game_state_json': mark_safe(json.dumps(state))
     })
@@ -120,7 +135,7 @@ def game(request, game_pk):
 
 # changed to just create the first gamestate for an existing game to support the createview better
 #def start_game(game_slug, usernames):
-def start_game(game):
+def start_game(game, chains=None, rows=9, columns=12, starting_stocks=25, variants=[]):
     """Create a new game.
 
     Takes a list of players to put in this game.
@@ -145,7 +160,7 @@ def start_game(game):
     #    users.append(user)
     users = game.users.all()
 
-    state = build_initial_state(users)
+    state = build_initial_state(users, chains, rows, columns, starting_stocks, variants)
 
     # Draw a tile for each player
     initial_draws = [(player, draw_tile(state)) for player in state['players']]
@@ -267,6 +282,7 @@ class TurnAction(Action):
             else:
                 # all merging is done
                 resolve_merge(self.state)
+                update_unplayable_tiles(self.state)
                 self.player = pluck_player(self.state, self.state['merging_player'])
                 self.advance_to_buy_or_next()
         else:
@@ -275,7 +291,7 @@ class TurnAction(Action):
 
     def advance_to_buy_or_next(self):
         if (any([c for c in self.state['chains'] if self.state['chains'][c] > 0]) and
-                min([get_stock_cost(self.state, c) for c in self.state['chains']]) <= self.player['cash']):
+                min([get_stock_cost(self.state, c) for c in self.state['chains'] if self.state['chains'][c] > 0]) <= self.player['cash']):
             # If there are any active chains and player has enough cash go to buy_stocks state
             self.state['state']['state'] = 'buy_stocks'
         else:
@@ -284,11 +300,17 @@ class TurnAction(Action):
                 return self.state
             else:
                 # There are no active chains so draw a tile and it's next player's turn
-                self.player['tiles'].append(draw_tile(self.state))
-                self.state['state'] = {
-                    'state': 'play_tile',
-                    'player': next_player(self.state)
-                }
+                draw_tile_for_player(self.state, self.player)
+                self.transition_to_play_tile()
+
+    def transition_to_play_tile(self):
+        next_player_name = next_player(self.state)
+
+        self.state['state'] = {
+            'state': 'play_tile',
+            'player': next_player_name
+        }
+        update_unplayable_tiles(self.state)
 
     def prepare_merger(self, state):
         """Modify state to start mergering.
@@ -359,7 +381,7 @@ class PlayTileAction(TurnAction):
         Else:
             Call prepare_merger
         """
-        neighbors = set([c for c in get_neighboring_assignments(state, state['active_cell']) if c is not None and c != "island"])
+        neighbors = set([c[:-2] if c.endswith('2x') else c for c in get_neighboring_assignments(state, state['active_cell']) if c is not None and c != "island"])
         state['merging_chains'] = sorted(list(neighbors), key=lambda x: state['chains'][x], reverse=True)
 
         chain_sizes = [state['chains'][c] for c in state['merging_chains']]
@@ -375,66 +397,103 @@ class PlayTileAction(TurnAction):
 
         if self.tile not in player['tiles']:
             logger.error("{} trying to play tile {} not in hand".format(player['username'], self.tile))
-            raise ActionForbiddenException()
+            raise ActionForbiddenException("{} is not in your hand.")
 
         # Set active_cell
         state['active_cell'] = self.tile
-        neighbors = get_neighboring_assignments(state, self.tile)
 
         # Remove played tile from hand
         player['tiles'].remove(self.tile)
-
         history_added = False
-        if all([n is None for n in neighbors]):
-            # if no neigboring hotels
-            state['hotels'][self.tile] = 'island'
-            self.advance_to_buy_or_next()
-        elif all([n is None or n == 'island' for n in neighbors]):
-            # if there are only island hotels adjacent
-            if any([c for c in state['chains'] if state['chains'][c] == 0]):
-                # If there are available chains in the supply
-                state['hotels'][self.tile] = 'island'
-                state['state']['state'] = 'declare_chain'
-            else:
-                # TODO client need to prevent user from forming chains with no chains available
-                logger.error("{} plays {} to form chain but no available chains".format(player['username'], self.tile))
-                # TODO what if every tile forms a chain?!?!?
-                raise ActionForbiddenException("No available chains")
-        else:
-            # There must at least be one chain adjacent
-            neighboring_chains = set([n for n in neighbors if n is not None and n != 'island'])
-            if len(neighboring_chains) == 1:
-                # If all have chain == None or chain == island or chain == some_chain:
-                size = 1
-                chain = neighboring_chains.pop()
-                state['hotels'][self.tile] = chain
-                if 'island' in neighbors:
-                    size += convert_islands(state, chain)
-                state['chains'][chain] += size
-                self.advance_to_buy_or_next()
-            else:
-                # Check if this tile is unplayable (should probably be a helper function)
-                safe_neighbors = [n for n in neighboring_chains if state['chains'][n] >= 11]
-                if len(safe_neighbors) >= 2:
-                    # just draw a new tile
-                    state['history'].append(['discard_unplayable_tile', self.tile])
-                    history_added = True
-                    self.player['tiles'].append(draw_tile(self.state))
-                    # logger.error("Cannot play {} because 2+ neighboring chains are safe".format(self.tile))
-                    # raise ActionForbiddenException()
-                else:
-                    state['history'].append([
-                        'play_tile',
-                        player['username'],
-                        self.tile,
-                        'merger'
-                    ])
-                    history_added = True
 
-                    # Set current cell to island while merger is going on
-                    state['hotels'][state['active_cell']] = 'island'
-                    # Change state to merger
-                    self.start_merger_helper(state, neighboring_chains)
+        if 'double_tiles_variant' in state['variants'] and self.tile in state['hotels']:
+            # Variant case, the tile is already down, just add 2x
+            # View and declare_chain are responsible for the rest
+            if state['hotels'][self.tile] == 'island':
+                if any([c for c in state['chains'] if state['chains'][c[:-2] if c.endswith('2x') else c] == 0]):
+                    # if there are available chains
+                    state['hotels'][self.tile] = 'island2x'
+                    state['state']['state'] = 'declare_chain'
+                    update_unplayable_tiles(state)
+                else:
+                    if len(self.player['temp_unplayable_tiles']) == len(self.player['tiles']) + 1:
+                        # this code is copied below, bad bad bad
+                        # ALL TILES MAKE CHAIN BUT NONE AVAILABLE
+                        print("Gotta discard this because all unplayabel")
+                        draw_tile_for_player(self.state, self.player)
+                        state['supply']['tiles'].append(self.tile)
+                        random.shuffle(state['supply']['tiles'])
+                        state['history'].append(['discard_temporarily_unplayable_tile', self.player['username'], self.tile])
+                        history_added = True
+                    else:
+                        raise ActionForbiddenException("No available chains")
+            else:
+                state['chains'][state['hotels'][self.tile]] += 1
+                state['hotels'][self.tile] = '{}2x'.format(state['hotels'][self.tile])
+                self.advance_to_buy_or_next()
+        else:
+            # NOT a variant
+            # Prep for computations by getting active cell's neighbors
+            neighbors = get_neighboring_assignments(state, self.tile)
+
+            if all([n is None for n in neighbors]):
+                # if no neigboring hotels
+                state['hotels'][self.tile] = 'island'
+                self.advance_to_buy_or_next()
+            elif all([n is None or n == 'island' for n in neighbors]):
+                # if there are only island hotels adjacent
+                if any([c for c in state['chains'] if state['chains'][c[:-2] if c.endswith('2x') else c] == 0]):
+                    # If there are available chains in the supply
+                    state['hotels'][self.tile] = 'island'
+                    state['state']['state'] = 'declare_chain'
+                    update_unplayable_tiles(state)
+                else:
+                    # Because tile is already removed from hand, temp unplayable
+                    # Will be one greater than current hand if all are temp unplayable
+                    if len(self.player['temp_unplayable_tiles']) == len(self.player['tiles']) + 1:
+                        # this same code is a copy of above, bad bad bad
+                        # ALL TILES MAKE CHAIN BUT NONE AVAILABLE
+                        print("Gotta discard this because all unplayabel")
+                        draw_tile_for_player(self.state, self.player)
+                        state['supply']['tiles'].append(self.tile)
+                        random.shuffle(state['supply']['tiles'])
+                        state['history'].append(['discard_temporarily_unplayable_tile', self.player['username'], self.tile])
+                        history_added = True
+                    else:
+                        raise ActionForbiddenException("No available chains")
+            else:
+                # There must at least be one chain adjacent
+                neighboring_chains = set([n[:-2] if n.endswith('2x') else n for n in neighbors if n is not None and not n.startswith('island')])
+                if len(neighboring_chains) == 1:
+                    # If all have chain == None or chain == island or chain == some_chain:
+                    size = 1
+                    chain = neighboring_chains.pop()
+                    state['hotels'][self.tile] = chain
+                    if 'island' in neighbors:
+                        size += convert_islands(state, chain)
+                    state['chains'][chain] += size
+                    self.advance_to_buy_or_next()
+                else:
+                    # Check if this tile is unplayable (should probably be a helper function)
+                    safe_neighbors = [n for n in neighboring_chains if state['chains'][n[:-2] if n.endswith('2x') else n] >= 11]
+                    if len(safe_neighbors) >= 2:
+                        # just draw a new tile
+                        state['history'].append(['discard_unplayable_tile', self.player['username'], self.tile])
+                        history_added = True
+                        draw_tile_for_player(self.state, self.player)
+                    else:
+                        state['history'].append([
+                            'play_tile',
+                            player['username'],
+                            self.tile,
+                            'merger'
+                        ])
+                        history_added = True
+
+                        # Set current cell to island while merger is going on
+                        state['hotels'][state['active_cell']] = 'island'
+                        # Change state to merger
+                        self.start_merger_helper(state, neighboring_chains)
 
         if not history_added:
             state['history'].append([
@@ -457,17 +516,30 @@ class DeclareChainAction(TurnAction):
         #     Is chain available?
         if self.chain not in [c for c in self.state['chains'] if self.state['chains'][c] == 0]:
             logger.error("{} tried to found already active chain {}".format(self.player['username'], self.chain))
-            raise ActionForbiddenException()
+            raise ActionForbiddenException('Cannot found already active chain {}'.format(self.chain))
+
+        # Save this for later island2x check
+        active_cell_chain = self.state['hotels'][self.state['active_cell']]
 
         # If it checks out:
         #     Use active_cell from state, set its chain to "chain"
-        self.state['hotels'][self.state['active_cell']] = self.chain
+        if self.state['hotels'][self.state['active_cell']] == 'island2x':
+            self.state['hotels'][self.state['active_cell']] = self.chain + '2x'
+        else:
+            self.state['hotels'][self.state['active_cell']] = self.chain
 
         # Track size of new chain as we go
         size = 1
 
         #     Do a crazy search through the board to set all orthogonally adjacent "island" cells to "chain"
         size += convert_islands(self.state, self.chain)
+
+        if active_cell_chain == 'island2x':
+            # Only possible in double_tiles variant when placing a tile on top of
+            # an island tile, by proof there cannot be neighbors so this chain will
+            # be size 2
+            print("It was an island2x")
+            size = 2
 
         # Set size of chain
         self.state['chains'][self.chain] = size
@@ -532,7 +604,7 @@ class BuyStocksAction(TurnAction):
         # # Draw Tile
         # Call draw_tile
         # Add drawn tile to players hand
-        self.player['tiles'].append(draw_tile(self.state))
+        draw_tile_for_player(self.state, self.player)
 
         # # End Turn
         # If end_game flag is True
@@ -544,10 +616,7 @@ class BuyStocksAction(TurnAction):
         # Else
         # Set state to "play_tile,next_player()"  # where do we change state.current_player? maybe only need it globally for merging so merging_player?
         # Notify other players
-        self.state['state'] = {
-            'state': 'play_tile',
-            'player': next_player(self.state)
-        }
+        self.transition_to_play_tile()
 
         GameState.objects.create(game=self.game, state=json.dumps(self.state))
         return self.state
@@ -730,8 +799,12 @@ def convert_islands(state, chain):
     while neighboring_hotels:
         # Assign each hotel to chain
         for hotel in neighboring_hotels:
-            state['hotels'][hotel] = chain
-            size += 1
+            if hotel in state['hotels'] and state['hotels'][hotel][:-2] == '2x':
+                state['hotels'][hotel] = chain + '2x'
+                size += 2
+            else:
+                state['hotels'][hotel] = chain
+                size += 1
 
         # Pretty sure this converges, assuming that we are correctly forming a chain
         # here which we don't check but play_tile does (hopefully correctly)
@@ -835,6 +908,43 @@ def draw_tile(state):
     return state['supply']['tiles'].pop()
 
 
+def draw_tile_for_player(state, player):
+    player['tiles'].append(draw_tile(state))
+    update_unplayable_tiles(state)
+
+
+def update_unplayable_tiles(state):
+    for player in state['players']:
+        # player = pluck_player(self.state, next_player_name)
+        player['unplayable_tiles'] = []
+        player['temp_unplayable_tiles'] = []
+
+        active_chain_count = len([c for c in state['chains'] if state['chains'][c] > 0])
+
+        for tile in player['tiles']:
+            # permanently unplayable because would merge two safe chains
+            neighbors = get_neighboring_assignments(state, tile)
+            neighboring_chains = set([n[:-2] if n.endswith('2x') else n for n in neighbors if n is not None and not n.startswith('island')])
+            safe_neighbors = [n for n in neighboring_chains if state['chains'][n[:-2] if n.endswith('2x') else n] >= 11]
+            if len(safe_neighbors) >= 2:
+                print("{} is permanently unplayable".format(tile))
+                player['unplayable_tiles'].append(tile)
+
+            # temporarily unplayable tiles would create chain when none available
+            if active_chain_count == len(state['chains']):
+                # if this tile is adjacent to island but not chain
+                if 'island' in neighbors and not neighboring_chains:
+                    player['temp_unplayable_tiles'].append(tile)
+
+                if (
+                    'double_tiles_variant' in state['variants'] and 
+                    len([n for n in neighbors if n is not None]) == 0 and 
+                    tile in state['hotels'] and 
+                    state['hotels'][tile] == 'island'
+                ):
+                    player['temp_unplayable_tiles'].append(tile)
+
+
 def pluck_player(state, username):
     return [p for p in state['players'] if p['username'] == username][0]
 
@@ -890,10 +1000,13 @@ def pay_bonuses(state):
 
     stock_holders = [p for p in state['players'] if p['stocks'][defunct_chain] > 0]
 
-    if len(state['players']) == 2:
+    # debug this http://ack-wire.herokuapp.com/admin/game/gamestate/2152/change/
+    # should pay both bonuses if 2 players tied for first
+
+    if len(state['players']) == 2 and not 'no_2player_tile_draw_variant' in state['variants']:
         tile = state['supply']['tiles'][random.randint(0, len(state['supply']['tiles']))]
         stock_holders.append({
-            'username': None,
+            'username': 'tile_draw',
             'stocks': {
                 defunct_chain: int(tile[1:])
             },
@@ -902,11 +1015,19 @@ def pay_bonuses(state):
 
     stock_holders.sort(key=lambda x: x['stocks'][defunct_chain], reverse=True)
 
+    # first_maj = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[0]['stocks'][defunct_chain]]
+    # if len(first_maj) > 1 or len(stock_holders) == 1:
+    #     bonus = majority_bonus + minority_bonus
+    #     for p in first_maj:
+    #         p['cash'] += int(math.ceil(bonus / 100.0)) * 100
+
+
+
     if len(stock_holders) == 1:
         # if there is only one stock holder, they get both bonuses
         bonus = majority_bonus + minority_bonus
         stock_holders[0]['cash'] += bonus
-        state['history'].append(['both_bonus', bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
+        state['history'].append(['both_bonus', defunct_chain, bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
     else:
         equal_to_first = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[0]['stocks'][defunct_chain]]
         if len(equal_to_first) != 1:
@@ -917,10 +1038,10 @@ def pay_bonuses(state):
             for p in equal_to_first:
                 p['cash'] += bonus
 
-            state['history'].append(['majority_bonus', bonus] + [p['username'] for p in equal_to_first] + [stock_holders[0]['stocks'][defunct_chain]])
+            state['history'].append(['majority_bonus', defunct_chain, bonus] + [p['username'] for p in equal_to_first] + [stock_holders[0]['stocks'][defunct_chain]])
         else:
             stock_holders[0]['cash'] += majority_bonus
-            state['history'].append(['majority_bonus', majority_bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
+            state['history'].append(['majority_bonus', defunct_chain, majority_bonus, stock_holders[0]['username'], stock_holders[0]['stocks'][defunct_chain]])
 
             equal_to_second = [p for p in stock_holders if p['stocks'][defunct_chain] == stock_holders[1]['stocks'][defunct_chain]]
             if len(equal_to_second) != 1:
@@ -930,10 +1051,10 @@ def pay_bonuses(state):
                 for p in equal_to_second:
                     p['cash'] += bonus
 
-                state['history'].append(['minority_bonus', bonus] + [p['username'] for p in equal_to_second] + [stock_holders[1]['stocks'][defunct_chain]])
+                state['history'].append(['minority_bonus', defunct_chain, bonus] + [p['username'] for p in equal_to_second] + [stock_holders[1]['stocks'][defunct_chain]])
             else:
                 stock_holders[1]['cash'] += minority_bonus
-                state['history'].append(['minority_bonus', minority_bonus, stock_holders[1]['username'], stock_holders[1]['stocks'][defunct_chain]])
+                state['history'].append(['minority_bonus', defunct_chain, minority_bonus, stock_holders[1]['username'], stock_holders[1]['stocks'][defunct_chain]])
 
 
 def dispose_loser_stock(request):
@@ -997,6 +1118,10 @@ def resolve_merge(state):
     for cell, chain in state['hotels'].items():
         if chain in state['defunct_chains']:
             state['hotels'][cell] = winner_chain
+        if chain[:-2] in state['defunct_chains']:
+            print("{} -2 was in defunct_chains".format(chain))
+            state['hotels'][cell] = winner_chain + '2x'
+
 
     # Add to size of winning chain the sizes of all defunct chains + 1
     # Set size of defunct chains to 0

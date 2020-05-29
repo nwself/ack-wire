@@ -47,6 +47,19 @@ function array_move(arr, old_index, new_index) {
     return arr; // for testing
 };
 
+function addSpan(chain) {
+    return '<span class="swatch ' + chain + '">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> ' + chain;
+}
+
+function mergingText(permutationSet) {
+    return permutationSet.slice(1).reverse().reduce(function (prev, curr, i) {
+        if (i == 0) {
+            return  prev + " takes over " + addSpan(curr);
+        }
+        return prev + " then " + addSpan(curr);
+    }, addSpan(permutationSet[0]));
+}
+
 var stockCosts = [200, 200, 200, 300, 400, 500, 600, 600, 600, 600, 600, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 800, 800, 800, 800, 800, 800, 800, 800, 800, 800, 900, 900, 900, 900, 900, 900, 900, 900, 900, 900, 1000];
 
 var app = {
@@ -60,6 +73,10 @@ var app = {
     gameEnded: false,
     showEndGame: false,
     stockDisposer: new StockDisposer({merging_chains: ["Luxor"]}), // need a dummy because rivets parses the whole thing on startup
+    chosenWinner: null,
+    variants: false,
+    merging: false,
+    mergingHtml: '',
     play_tile: function () {
         console.log(arguments);
     },
@@ -227,6 +244,7 @@ var fsm = new machina.Fsm({
                        cart: cart
                    }
                }));
+               this.transition('wait_for_server')
             },
 
             _onExit: function () {
@@ -238,43 +256,70 @@ var fsm = new machina.Fsm({
                 app.instruction = "Determine winner of merger."
 
                 app.showDetermineWinner = true;
-                app.mergingChains = fsm.acquire.merging_chains.map(function (chainName, i) {
-                    return {
-                        order: i + 1,
-                        name: chainName,
-                        size: fsm.acquire.chains[chainName],
-                        canUp: function (chain) {
-                            var index = chain.order - 1;
-                            return index != 0 && app.mergingChains[index].size >= app.mergingChains[index-1].size;
-                        },
-                        up: function (event, model) {
-                            var index = model.chain.order - 1;
-                            var newChains = app.mergingChains.slice();
-                            array_move(newChains, index, index - 1);
-                            newChains[index].order++;
-                            newChains[index - 1].order--;
-                            app.mergingChains = newChains; 
-                        },
-                        canDown: function (chain) {
-                            var index = chain.order - 1;
-                            return index != app.mergingChains.length-1 && app.mergingChains[index].size <= app.mergingChains[index+1].size;
-                        },
-                        down: function (event, model) {
-                            var index = model.chain.order - 1;
-                            var newChains = app.mergingChains.slice();
-                            array_move(newChains, index, index + 1);
-                            newChains[index].order--;
-                            newChains[index + 1].order++;
-                            app.mergingChains = newChains;
+
+                // group merging_chains by size
+                var groups = fsm.acquire.merging_chains.reduce(function (prev, chainName) {
+                    var size = fsm.acquire.chains[chainName];
+                    if (size in prev) {
+                        prev[size].push(chainName);
+                    } else {
+                        prev[size] = [chainName];
+                    }
+                    return prev;
+                }, {});
+
+                // compute each iteration of size
+                var iterations = Object.keys(groups).sort(function (a, b) {
+                    return b - a;
+                }).map(function (size) {
+                    return permutator(groups[size]);
+                });
+
+                function combinePermutations(permutationSets) {
+                    if (permutationSets.length == 1) {
+                        return permutationSets[0];
+                    }
+                    var biggestSet = permutationSets[0];
+                    var smallerSets = combinePermutations(permutationSets.slice(1));
+
+                    // for list in permute[A I]:
+                    //   for inner in permute[T L]:
+                    //     yield list.concat(inner)
+
+                    var output = [];
+                    for (var i = 0; i < biggestSet.length; i++) {
+                        for (var j = 0; j < smallerSets.length; j++) {
+                            output.push(biggestSet[i].concat(smallerSets[j]));
                         }
+                    }
+                    return output;
+                }
+
+                // var buttons = combinePermutations([
+                //     permutator(["I", "A"]), 
+                //     permutator(["C"]),
+                //     // permutator(["T", "I", "L", "C"]),
+                // ]);
+                var buttons = combinePermutations(iterations);
+                app.mergingChains = buttons.map(function (permutationSet, i) {
+                    return {
+                        text: mergingText(permutationSet),
+                        value: i,
+                        id: "merging-id-" + i,
+                        order: permutationSet
                     }
                 });
             },
 
             'determine_winner': function () {
-                var winnerOrder = app.mergingChains.map(function (chain) {
-                    return chain.name;
-                });
+                // var winnerOrder = app.mergingChains.map(function (chain) {
+                //     return chain.name;
+                // });
+                if (app.chosenWinner == null) {
+                    console.error("determine_winner but no chosenWinner")
+                    return;
+                }
+                var winnerOrder = app.mergingChains[app.chosenWinner].order;
                 console.log("Here in fsm determining winner", winnerOrder);
                 chatSocket.send(JSON.stringify({
                     action: 'determine_winner',
@@ -286,22 +331,36 @@ var fsm = new machina.Fsm({
 
             _onExit: function () {
                 app.showDetermineWinner = false;
+                app.chosenWinner = null;
             }
         },
         'end_game': {
             _onEnter: function () {
-                var instruction = "Game over."
+                var instruction = "Game over!<p></p><table><tbody>"
                 fsm.acquire.players.sort(function (a, b) {
                     return b.cash - a.cash;
                 })
-                fsm.acquire.players.forEach(function (player) {
-                    instruction += " " + player.username + ": $" + player.cash;
+                fsm.acquire.players.forEach(function (player, i) {
+                    instruction += "<tr><td>" + (i+1) + ".</td><td>" + 
+                        player.username + "</td><td>$" + numberWithCommas(player.cash) + "</td></tr>";
                 });
+                instruction += "</tbody></table";
                 app.instruction = instruction;
             }
         },
+        'wait_for_server': {
+            // this empty state brought to you by the following:
+            //    if server tells us to transition to a state we are already
+            //    in, the fsm does nothing and _onEnter doesn't run for that state
+            //    only a problem for dispose_stock at the moment
+        },
         'waiting': {
-
+            _onEnter: function () {
+                app.myturn = false;
+            },
+            _onExit: function () {
+                app.myturn = true;
+            }
         }
     },
 
@@ -319,12 +378,21 @@ var fsm = new machina.Fsm({
             app.player = app.player[0];
             app.hand = app.player.tiles.map(function (coordinates) {
                 // side effect time
-                acquire.hotels[coordinates] = 'in-hand';
+                if (acquire.hotels[coordinates]) {
+                    if (acquire.hotels[coordinates] == 'in-hand') {
+                        acquire.hotels[coordinates] = 'in-hand2x'
+                    } else {
+                        acquire.hotels[coordinates] += ' in-hand';
+                    }
+                } else {
+                    acquire.hotels[coordinates] = 'in-hand';
+                }
 
                 return new Tile({
                     coordinates: coordinates
                 });
             });
+            // app.player.cash = numberWithCommas(app.player.cash);
         } else {
             app.player = null;
         }
@@ -335,9 +403,34 @@ var fsm = new machina.Fsm({
             for (var j = 0; j < 12; j++) {
                 var coordinates = letters[i] + (j + 1);
 
+                var chain = null;
+                if (coordinates in acquire.hotels) {
+                    chain = acquire.hotels[coordinates]
+                }
+                if (app.player && 
+                        (app.player.temp_unplayable_tiles && app.player.temp_unplayable_tiles.indexOf(coordinates) != -1)) {
+                        // app.player.unplayable_tiles && app.player.unplayable_tiles.indexOf(coordinates) != -1)) {
+
+                    if (chain.includes('in-hand')) {
+                        chain += ' unplayable';
+                    }
+                    if (chain.includes('in-hand2x')) {
+                        chain = 'unplayable2x';
+                    }
+                }
+
+                var active = coordinates == acquire.active_cell;
+
+                if (chain && (chain in acquire.chains)) {
+                    coordinates = chain[0];
+                }
+                if (chain && (chain.slice(0, -2) in acquire.chains)) {
+                    coordinates = chain[0] + "<sub>2</sub>";
+                }
+
                 row.push(new Cell({
                     coordinates: coordinates,
-                    chain: ((coordinates in acquire.hotels) ? acquire.hotels[coordinates] : null),
+                    chain: active ? chain + ' active' : chain,
                 }));
             }
             app.board.push(row);
@@ -347,15 +440,17 @@ var fsm = new machina.Fsm({
             return new Player(player);
         });
 
-        app.playerStocks = Object.keys(app.player.stocks).filter(function (stockName) {
-            return app.player.stocks[stockName] > 0;
-        }).map(function (stockName) {
-            return {
-                name: stockName,
-                count: app.player.stocks[stockName],
-                swatch: stockName + " swatch"
-            };
-        });
+        if (app.player) {
+            app.playerStocks = Object.keys(app.player.stocks).filter(function (stockName) {
+                return app.player.stocks[stockName] > 0;
+            }).map(function (stockName) {
+                return {
+                    name: stockName,
+                    count: app.player.stocks[stockName],
+                    swatch: stockName + " swatch"
+                };
+            });
+        }
 
         app.supplyStocks = Object.keys(acquire.supply.stocks).map(function (stockName) {
             return new Stock({
@@ -365,15 +460,81 @@ var fsm = new machina.Fsm({
             });
         });
 
-        app.history = acquire.history.reverse();
+        app.merging = acquire.merging_chains.length > 0 && acquire.state.state != "determine_winner" && acquire.state.state != "end_game";
+        if (app.merging) {
+            app.mergingHtml = mergingText(acquire.merging_chains);
+        }
 
-        if (acquire.state.player == username || acquire.state.player == '') {
+        app.history = acquire.history.reverse().concat(acquire.variants.map(function (variant) {
+            return "VARIANT: " + variant;
+        }));
+
+        if (app.player && (acquire.state.player == username || acquire.state.player == '')) {
             app.myturn = true;
+            this.transition(acquire.state.state);
+        } else if (acquire.state.state == "end_game") {
+            app.instruction = "End game";
             this.transition(acquire.state.state);
         } else {
             this.transition("waiting");
             app.instruction = "Waiting for " + acquire.state.player + " to " + acquire.state.state;
         }
+
+        var columns = Object.keys(acquire.chain_costs).reduce(function (prev, curr) {
+            if (!prev) { prev = {}; }
+            if (!(acquire.chain_costs[curr] in prev)) {
+                prev[acquire.chain_costs[curr]] = [];
+            }
+            prev[acquire.chain_costs[curr]].push(curr);
+            return prev;
+        }, {});
+
+        app.scheduleColumns = Object.values(columns).map(function (group) {
+            return group.join('<br/>');
+        });
+
+        var ranges = acquire.schedule.reduce(function (prev, cost, i) {
+            if (prev.length == 0 || prev[prev.length - 1].cost != cost) {
+                if (prev.length > 0) {
+                    prev[prev.length - 1].end = i - 1;
+                }
+                prev.push({
+                    cost: cost,
+                    start: i
+                });
+            }
+            return prev;
+        }, []);
+
+        var hotels = ranges.map(function (range) {
+            var hotels = range.end;
+            if (range.start != range.end && range.start != 0) {
+                hotels = range.start + "-" + range.end;
+
+                if (!range.end) {
+                    hotels = range.start + "+";
+                }
+            }
+            return hotels;
+        });
+
+        ranges.push({
+            cost: ranges[ranges.length - 1].cost + 100,
+        });
+        ranges.push({
+            cost: ranges[ranges.length - 1].cost + 100,
+        });
+
+        app.schedule = ranges.map(function (range, i) {
+            return [
+                (i < hotels.length ? hotels[i] : "-"),
+                (i - 1 > 0 && i - 1 < hotels.length ? hotels[i - 1] : "-"),
+                (i - 2 > 0 ? hotels[i - 2] : "-"),
+                '$' + numberWithCommas(range.cost),
+                '$' + numberWithCommas(range.cost * 10),
+                '$' + numberWithCommas(range.cost * 5)
+            ];
+        });
 
         fsm.checkForEnd(acquire.chains);
     },
@@ -389,7 +550,10 @@ var fsm = new machina.Fsm({
         }, false);
         if (allSafe || over41) {
             console.log("allSafe", allSafe, "over41", over41);
-            app.showEndGame = true;
+            if (app.myturn && !fsm.acquire.end_game) {
+                console.log("myturn", app.myturn, "gameEnded", fsm.acquire.end_game);
+                app.showEndGame = true;
+            }
         }
         app.gameEnded = fsm.acquire.end_game;
     },
@@ -427,7 +591,10 @@ function Player(obj) {
     this.name = obj.username;
     this.stocks = obj.stocks;
     this.cash = obj.cash;
-    this.isme = app.player.username == this.name;
+    this.isme = (app.player ? app.player.username == this.name : false);
+    this.isturn = (fsm.acquire.merging_chains.length == 0) ?
+        fsm.acquire.state.player == this.name :
+        fsm.acquire.merging_player == this.name;
 }
 
 function Cell(obj) {
@@ -436,7 +603,10 @@ function Cell(obj) {
 }
 
 Cell.prototype.play = function (event, model) {
-    if (event.target.classList.contains('in-hand')) {
+    if (event.target.classList.contains('in-hand') ||
+        event.target.classList.contains('in-hand2x') ||
+        event.target.classList.contains('unplayable') ||
+        event.target.classList.contains('unplayable2x')) {
         fsm.tileClicked(model.cell);
     }
 }
@@ -474,7 +644,6 @@ function Stock(obj) {
 }
 
 Stock.prototype.getCost = function (event, model) {
-    console.log("Getting chain cost from model", model);
     return app.lookupChainCost(this.name);
 }
 
@@ -513,13 +682,13 @@ function StockDisposer(state) {
 }
 
 StockDisposer.prototype.tradeIncome = function () {
-    return this.disposeCart.trade / 2 + " " + this.state.merging_chains[0];
+    return this.disposeCart.trade / 2;
 }
 StockDisposer.prototype.sellIncome = function () {
     return this.disposeCart.sell * app.lookupChainCost(this.defunctChain);
 }
 StockDisposer.prototype.keepCount = function () {
-    return app.player.stocks[this.defunctChain] - this.disposeCart.trade - this.disposeCart.sell;
+    return (app.player ? app.player.stocks[this.defunctChain] - this.disposeCart.trade - this.disposeCart.sell : false);
 }
 StockDisposer.prototype.canTrade = function () {
     return this.keepCount() >= 2 && fsm.acquire.supply.stocks[this.winnerChain] > this.disposeCart.trade / 2;
@@ -557,9 +726,52 @@ rivets.formatters.historyFormatter = function(value){
   return value;
 }
 
+rivets.formatters.stocksLength = function(value)
+{
+  var length = value ? (value.length || 0) : 0;
+  return length == 1 ? "1 stock" : length + " stocks"
+};
+
+rivets.formatters.firstName = function(value)
+{
+  return value && value.length > 0 ? value[0].name : '';
+};
+
+rivets.formatters.comma = function(value)
+{
+  return value ? numberWithCommas(value) : value;
+};
+
 document.addEventListener("DOMContentLoaded", function() {
     rivets.bind(document.getElementById("main"), {app: app});
 });
+
+function numberWithCommas(x) {
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function permutator(inputArr) {
+  var results = [];
+
+  function permute(arr, memo) {
+    var cur, memo = memo || [];
+
+    for (var i = 0; i < arr.length; i++) {
+      cur = arr.splice(i, 1);
+      if (arr.length === 0) {
+        results.push(memo.concat(cur));
+      }
+      permute(arr.slice(), memo.concat(cur));
+      arr.splice(i, 0, cur[0]);
+    }
+
+    return results;
+  }
+
+  return permute(inputArr);
+}
+
+
 
 // // represents the stata and is synced with/bound to the HTML rivets template
 // var app = {

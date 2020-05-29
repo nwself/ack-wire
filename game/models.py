@@ -10,12 +10,33 @@ from django.urls import reverse
 class Game(models.Model):
     name = models.SlugField(db_index=True)
     users = models.ManyToManyField(settings.AUTH_USER_MODEL)
+    double_tiles_variant = models.BooleanField(default=False)
+    no_2player_tile_draw_variant = models.BooleanField(default=False)
 
     def get_active_state(self):
-        return self.gamestate_set.all().order_by('-effective').first().get_state()
+        state = self.gamestate_set.all().order_by('-effective').first()
+        return state.get_state() if state else None
 
     def get_absolute_url(self):
         return reverse('game-view', kwargs={'game_pk': self.pk})
+
+    def game_over(self):
+        state = self.get_active_state()
+        return state['state']['state'] == 'end_game' if state else True
+
+    def get_winner(self):
+        state = self.get_active_state()
+        return sorted(state['players'], key=lambda x: x['cash'], reverse=True)[0]['username'] if state else ''
+
+    def get_variants(self):
+        variants = []
+        for field in [
+            'double_tiles_variant',
+            'no_2player_tile_draw_variant'
+        ]:
+            if self.__getattribute__(field):
+                variants.append(field)
+        return variants
 
     def __str__(self):
         return self.name
@@ -37,7 +58,7 @@ class GameState(models.Model):
         return "{} {}".format(self.game.name, self.effective)
 
 
-def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=25):
+def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=25, variants=[]):
     if chains is None:
         chains = [
             ("Luxor", 0),
@@ -74,7 +95,12 @@ def build_initial_state(users, chains=None, rows=9, columns=12, starting_stocks=
             'state': "play_tile"    # this is state.state.state which is a stupid thing to call something
         },
         'end_game': False,     # used to end game when a player calls it
-        'history': []
+        'history': [],
+        'variants': variants
     }
+
+    if 'double_tiles_variant' in variants:
+        initial_state['supply']['tiles'].extend(initial_state['supply']['tiles'])
+
     random.shuffle(initial_state['supply']['tiles'])
     return initial_state

@@ -43,9 +43,14 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
+    'allauth.socialaccount.providers.discord',
     'debug_toolbar',
+    'django_extensions',
     'channels',
+    'crispy_forms',
+    'django_select2',
     'game',
+    'matcha',
 ]
 
 MIDDLEWARE = [
@@ -64,7 +69,9 @@ ROOT_URLCONF = 'acquire.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            os.path.join(BASE_DIR, 'acquire/templates/')
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -76,6 +83,9 @@ TEMPLATES = [
         },
     },
 ]
+
+# http://django-crispy-forms.readthedocs.io/en/latest/install.html#template-packs
+CRISPY_TEMPLATE_PACK = "bootstrap4"
 
 AUTHENTICATION_BACKENDS = (
     # Needed to login by username in Django admin, regardless of `allauth`
@@ -194,3 +204,14 @@ if os.environ.get("REDIS_URL"):
     django_heroku.settings(locals())
 
     DATABASES['default']['CONN_MAX_AGE'] = 0
+
+    INSTALLED_APPS += ["anymail"]
+
+    DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL")
+    EMAIL_BACKEND = "anymail.backends.mailjet.EmailBackend"
+    EMAIL_SUBJECT_PREFIX = "[ack-wire]"
+    ANYMAIL = {
+        "MAILJET_API_KEY": os.environ.get("MAILJET_API_KEY"),
+        "MAILJET_SECRET_KEY": os.environ.get("MAILJET_SECRET_KEY"),
+        "MAILJET_API_URL": "https://api.mailjet.com/v3",
+    }
