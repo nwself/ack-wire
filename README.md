@@ -9,8 +9,6 @@
 
 1. Get redis running, install if needed.
 
-1. (optional?) Get Django Channels running: `daphne acquire.asgi:application --port 8000 --bind 0.0.0.0 -v2`
-
 1. `./manage.py runserver`
 
 1. Go to `localhost:8000` in your browser.
