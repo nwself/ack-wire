@@ -528,8 +528,8 @@ var fsm = new machina.Fsm({
         app.schedule = ranges.map(function (range, i) {
             return [
                 (i < hotels.length ? hotels[i] : "-"),
-                (i - 1 > 0 && i - 1 < hotels.length ? hotels[i - 1] : "-"),
-                (i - 2 > 0 ? hotels[i - 2] : "-"),
+                (i - 1 >= 0 && i - 1 < hotels.length ? hotels[i - 1] : "-"),
+                (i - 2 >= 0 ? hotels[i - 2] : "-"),
                 '$' + numberWithCommas(range.cost),
                 '$' + numberWithCommas(range.cost * 10),
                 '$' + numberWithCommas(range.cost * 5)
