@@ -346,6 +346,12 @@ var fsm = new machina.Fsm({
                 });
                 instruction += "</tbody></table";
                 app.instruction = instruction;
+
+                if (fsm.acquire.players[0].username == username) {
+                    document.getElementById("winner-audio").play();
+                } else {
+                    document.getElementById("loser-audio").play();
+                }
             }
         },
         'wait_for_server': {
@@ -359,6 +365,7 @@ var fsm = new machina.Fsm({
                 app.myturn = false;
             },
             _onExit: function () {
+                document.getElementById("myturn-audio").play();
                 app.myturn = true;
             }
         }
