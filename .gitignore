@@ -3,3 +3,5 @@
 dump.rdb
 *.log
 .env
+
+.envs

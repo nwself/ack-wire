@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import environ
+
+env = environ.Env()
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,9 +29,14 @@ SECRET_KEY = '_g#wc@o0wrnaxrrb&y$u49*o2z48e^8b#a5k7r=f4=!3bo^&@='
 DEBUG = True
 
 SITE_ID = 1
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['ack-wire.theboardgame.party']
 INTERNAL_IPS = ['127.0.0.1']
-
+CSRF_TRUSTED_ORIGINS = [
+        'https://ack-wire.theboardgame.party'
+]
+CORS_ORIGIN_WHITELIST = [
+    'ack-wire.theboardgame.party'
+]
 
 # Application definition
 
@@ -61,6 +69,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
@@ -112,12 +121,14 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
-}
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.sqlite3',
+#        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+#    }
+#}
+DATABASES = {"default": env.db("DATABASE_URL")}
+
 
 
 # Password validation
@@ -158,6 +169,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR + "/staticfiles"
 
 LOGGING = {
     'version': 1,
@@ -200,8 +212,8 @@ LOGGING = {
 
 # Configure Django App for Heroku.
 if os.environ.get("REDIS_URL"):
-    import django_heroku
-    django_heroku.settings(locals())
+    #import django_heroku
+    #django_heroku.settings(locals())
 
     DATABASES['default']['CONN_MAX_AGE'] = 0
 
